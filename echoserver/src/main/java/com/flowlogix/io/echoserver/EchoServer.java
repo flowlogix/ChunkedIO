@@ -5,15 +5,21 @@
  */
 package com.flowlogix.io.echoserver;
 
+import com.flowlogix.io.framework.Server;
+
 /**
  *
  * @author lprimak
  */
 public class EchoServer {
-    public EchoServer(String localhost, int i) {
+    private final Server server;
+
+    EchoServer(int port) {
+        this.server = new Server(port);
     }
 
+
     void start() {
-        throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+        server.start();
     }
 }

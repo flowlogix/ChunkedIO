@@ -11,6 +11,6 @@ package com.flowlogix.io.echoserver;
  */
 public class Main {
     public static void main(String[] args) {
-        new EchoServer("localhost", 7777).start();
+        new EchoServer(7777).start();
     }
 }
