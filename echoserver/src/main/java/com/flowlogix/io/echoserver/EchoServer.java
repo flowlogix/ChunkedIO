@@ -5,6 +5,7 @@
  */
 package com.flowlogix.io.echoserver;
 
+import com.flowlogix.io.framework.IOProperties;
 import com.flowlogix.io.framework.Server;
 
 /**
@@ -13,13 +14,23 @@ import com.flowlogix.io.framework.Server;
  */
 public class EchoServer {
     private final Server server;
+    private final IOProperties props = new IOProperties();
 
     EchoServer(int port) {
-        this.server = new Server(port);
+        props.setProperty(IOProperties.Props.PORT, port);
+        props.setProperty(IOProperties.Props.ACCEPTOR_POOL_SIZE, 5);
+        props.setProperty(IOProperties.Props.ACCEPT_BACKLOG, 15);
+        System.out.println(props);
+        this.server = new Server(props);
     }
 
 
-    void start() {
+    EchoServer start() {
         server.start();
+        return this;
+    }
+
+    void stop() {
+        server.stop();
     }
 }
