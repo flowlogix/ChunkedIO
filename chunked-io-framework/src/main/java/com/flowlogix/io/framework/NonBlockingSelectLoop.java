@@ -74,6 +74,7 @@ public class NonBlockingSelectLoop implements SelectLoop {
         try {
             server.socket.configureBlocking(false);
             server.socket.register(selector, SelectionKey.OP_ACCEPT, server);
+            selector.wakeup();
         } catch (IOException ex) {
             throw new RuntimeException(ex);
         }
@@ -84,6 +85,7 @@ public class NonBlockingSelectLoop implements SelectLoop {
         try {
             channel.channel.configureBlocking(false);
             channel.channel.register(selector, SelectionKey.OP_READ, channel);
+            selector.wakeup();
         } catch (IOException ex) {
             throw new RuntimeException(ex);
         }
