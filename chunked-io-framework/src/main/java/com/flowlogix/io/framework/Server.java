@@ -20,6 +20,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Logger;
+import java.util.stream.IntStream;
 
 /**
  *
@@ -34,6 +35,7 @@ public class Server {
     private final AtomicInteger acceptorThreadCount = new AtomicInteger();
     private final AtomicInteger channelThreadCount = new AtomicInteger();
     private final ConcurrentLinkedQueue<Channel> channels = new ConcurrentLinkedQueue<>();
+    private final Runnable acceptorRunnable;
 
     public Server(IOProperties props) {
         this.props = props;
@@ -48,6 +50,17 @@ public class Server {
                         String.format("Acceptor-%d", acceptorThreadCount.incrementAndGet()), 1024));
         channelExec = Executors.newCachedThreadPool(r -> new Thread(Thread.currentThread().getThreadGroup(),
                 r, String.format("Processor-%d", channelThreadCount.incrementAndGet()), 1024));
+
+        acceptorRunnable = logExceptions(() -> {
+            while (socket.isOpen()) {
+                try {
+                    channels.add(new Channel(this, socket.accept()));
+                } catch (AsynchronousCloseException ex) {
+                } catch (IOException ex) {
+                    throw new RuntimeException(ex);
+                }
+            }
+        });
     }
 
     public void start() {
@@ -57,16 +70,7 @@ public class Server {
             throw new RuntimeException(ex);
         }
         // +++ hook here
-        acceptorExec.submit(logExceptions(() -> {
-            while (socket.isOpen()) {
-                try {
-                    channels.add(new Channel(this, socket.accept()));
-                } catch (AsynchronousCloseException ex) {
-                } catch (IOException ex) {
-                    throw new RuntimeException(ex);
-                }
-            }
-        }));
+        IntStream.rangeClosed(1, props.getProperty(ACCEPTOR_POOL_SIZE)).forEach((ii) -> acceptorExec.submit(acceptorRunnable));
     }
 
     public void stop() {
