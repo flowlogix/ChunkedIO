@@ -16,7 +16,7 @@ import java.nio.channels.SocketChannel;
  */
 public class Channel {
     private final Transport transport;
-    private final SocketChannel channel;
+    final SocketChannel channel;
     private final int readChunkSize;
     private final int writeChunkSize;
     private final ByteBuffer readBuf;
@@ -34,8 +34,7 @@ public class Channel {
         } catch (IOException ex) {
             throw new RuntimeException(ex);
         }
-        // hook +++
-        transport.ioExec.submit(Transport.logExceptions(this::read));
+        transport.selectLoop.registerRead(this);
     }
 
     void close() {
@@ -46,7 +45,7 @@ public class Channel {
         }
     }
 
-    private void read() {
+    void read() {
         try {
             // +++ TODO chunks
             channel.read(readBuf);
@@ -56,7 +55,5 @@ public class Channel {
         } catch (IOException ex) {
             throw new RuntimeException(ex);
         }
-        // blocking +++
-        transport.ioExec.submit(Transport.logExceptions(this::read));
     }
 }

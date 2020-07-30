@@ -10,7 +10,6 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.SocketTimeoutException;
 import java.net.StandardSocketOptions;
-import java.nio.channels.SelectionKey;
 import java.nio.channels.ServerSocketChannel;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.logging.Logger;
@@ -49,8 +48,7 @@ public class Server {
     public void start() {
         try {
             socket.bind(new InetSocketAddress(port), transport.props.getProperty(ACCEPT_BACKLOG));
-            transport.selectLoop.configure(this);
-            transport.selectLoop.register(this, SelectionKey.OP_ACCEPT);
+            transport.selectLoop.registerAccept(this);
         } catch (IOException ex) {
             throw new RuntimeException(ex);
         }

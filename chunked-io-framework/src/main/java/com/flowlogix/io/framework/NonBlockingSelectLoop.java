@@ -7,9 +7,10 @@ package com.flowlogix.io.framework;
 
 import static com.flowlogix.io.framework.Transport.logExceptions;
 import java.io.IOException;
-import java.nio.channels.ClosedChannelException;
+import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
 import java.nio.channels.ServerSocketChannel;
+import java.nio.channels.SocketChannel;
 import java.nio.channels.spi.SelectorProvider;
 
 /**
@@ -39,6 +40,11 @@ public class NonBlockingSelectLoop implements SelectLoop {
                         Server server = (Server)key.attachment();
                         server.accept(channel);
                     }
+
+                    if (key.channel() instanceof SocketChannel) {
+                        Channel channel = (Channel)key.attachment();
+                        channel.read();
+                    }
                 });
             }
         } catch (IOException ex) {
@@ -64,19 +70,21 @@ public class NonBlockingSelectLoop implements SelectLoop {
     }
 
     @Override
-    public void configure(Server server) {
+    public void registerAccept(Server server) {
         try {
             server.socket.configureBlocking(false);
+            server.socket.register(selector, SelectionKey.OP_ACCEPT, server);
         } catch (IOException ex) {
             throw new RuntimeException(ex);
         }
     }
 
     @Override
-    public void register(Server server, int selectionKey) {
+    public void registerRead(Channel channel) {
         try {
-            server.socket.register(selector, selectionKey, server);
-        } catch (ClosedChannelException ex) {
+            channel.channel.configureBlocking(false);
+            channel.channel.register(selector, SelectionKey.OP_READ, channel);
+        } catch (IOException ex) {
             throw new RuntimeException(ex);
         }
     }
