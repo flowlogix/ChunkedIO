@@ -70,7 +70,7 @@ public class Server {
             throw new RuntimeException(ex);
         }
         // +++ hook here
-        IntStream.rangeClosed(1, props.getProperty(ACCEPTOR_POOL_SIZE)).forEach((ii) -> acceptorExec.submit(acceptorRunnable));
+        IntStream.rangeClosed(1, props.getProperty(ACCEPTOR_POOL_SIZE)).forEach(ii -> acceptorExec.submit(acceptorRunnable));
     }
 
     public void stop() {
