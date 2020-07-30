@@ -5,30 +5,27 @@
  */
 package com.flowlogix.io.framework;
 
-import static com.flowlogix.io.framework.IOProperties.Props.ACCEPTOR_POOL_SIZE;
 import static com.flowlogix.io.framework.IOProperties.Props.SOCKET_TIMEOUT_IN_MILLIS;
 import java.net.SocketException;
 import java.nio.channels.SelectionKey;
 import java.util.concurrent.ConcurrentLinkedQueue;
-import java.util.stream.IntStream;
 
 /**
  *
  * @author lprimak
  */
 public class BlockingSelectLoop implements SelectLoop {
-    private final Server server;
+    private final Transport transport;
     private volatile boolean started;
     private final ConcurrentLinkedQueue<Runnable> queue = new ConcurrentLinkedQueue<>();
 
 
-    public BlockingSelectLoop(Server server) {
-        this.server = server;
+    public BlockingSelectLoop(Transport transport) {
+        this.transport = transport;
     }
 
     private void run(Runnable runnable) {
-        IntStream.rangeClosed(1, server.props.getProperty(ACCEPTOR_POOL_SIZE))
-                .forEach(ii -> server.acceptorExec.submit(Server.logExceptions(runnable)));
+        transport.ioExec.submit(Transport.logExceptions(runnable));
     }
 
     @Override
@@ -49,16 +46,16 @@ public class BlockingSelectLoop implements SelectLoop {
     }
 
     @Override
-    public void configure() {
+    public void configure(Server server) {
         try {
-            server.socket.socket().setSoTimeout(server.props.getProperty(SOCKET_TIMEOUT_IN_MILLIS));
+            server.socket.socket().setSoTimeout(transport.props.getProperty(SOCKET_TIMEOUT_IN_MILLIS));
         } catch (SocketException ex) {
             throw new RuntimeException(ex);
         }
     }
 
     @Override
-    public void register(int selectionKey) {
+    public void register(Server server, int selectionKey) {
         Runnable runnable = () -> {
             while (server.socket.isOpen()) {
                 if ((selectionKey & SelectionKey.OP_ACCEPT) == SelectionKey.OP_ACCEPT) {

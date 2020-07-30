@@ -15,7 +15,7 @@ import java.nio.channels.SocketChannel;
  * @author lprimak
  */
 public class Channel {
-    private final Server server;
+    private final Transport transport;
     private final SocketChannel channel;
     private final int readChunkSize;
     private final int writeChunkSize;
@@ -23,8 +23,8 @@ public class Channel {
     private final ByteBuffer writeBuf;
 
 
-    Channel(Server server, SocketChannel channel) {
-        this.server = server;
+    Channel(Transport transport, SocketChannel channel) {
+        this.transport = transport;
         this.channel = channel;
         try {
             readChunkSize = channel.getOption(StandardSocketOptions.SO_RCVBUF);
@@ -35,7 +35,7 @@ public class Channel {
             throw new RuntimeException(ex);
         }
         // hook +++
-        server.channelExec.submit(Server.logExceptions(this::read));
+        transport.ioExec.submit(Transport.logExceptions(this::read));
     }
 
     void close() {
@@ -57,6 +57,6 @@ public class Channel {
             throw new RuntimeException(ex);
         }
         // blocking +++
-        server.channelExec.submit(Server.logExceptions(this::read));
+        transport.ioExec.submit(Transport.logExceptions(this::read));
     }
 }

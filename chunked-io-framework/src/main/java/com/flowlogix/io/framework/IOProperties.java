@@ -13,11 +13,9 @@ import java.util.logging.Logger;
  */
 public class IOProperties {
     public enum Props {
-        PORT,
         ACCEPT_BACKLOG,
-        ACCEPTOR_POOL_SIZE,
-        USING_SELECT_LOOP,
         SOCKET_TIMEOUT_IN_MILLIS,
+        USING_SELECT_LOOP,
     }
 
     private final Object properties[] = new Object[Props.values().length];

@@ -12,6 +12,6 @@ package com.flowlogix.io.framework;
 interface SelectLoop {
     void start();
     void stop();
-    void configure();
-    void register(int selectionKey);
+    void configure(Server server);
+    void register(Server server, int selectionKey);
 }

@@ -5,7 +5,7 @@
  */
 package com.flowlogix.io.framework;
 
-import static com.flowlogix.io.framework.Server.logExceptions;
+import static com.flowlogix.io.framework.Transport.logExceptions;
 import java.io.IOException;
 import java.nio.channels.ClosedChannelException;
 import java.nio.channels.Selector;
@@ -17,14 +17,12 @@ import java.nio.channels.spi.SelectorProvider;
  * @author lprimak
  */
 public class NonBlockingSelectLoop implements SelectLoop {
-    private final Server server;
-    final Selector selector;
+    private final Selector selector;
     private volatile boolean started;
     private final Thread selectLoopThread = new Thread(logExceptions(this::run), "SelectLoop");
 
 
-    public NonBlockingSelectLoop(Server server) {
-        this.server = server;
+    public NonBlockingSelectLoop() {
         try {
             this.selector = SelectorProvider.provider().openSelector();
         } catch (IOException ex) {
@@ -38,6 +36,7 @@ public class NonBlockingSelectLoop implements SelectLoop {
                 selector.select(key -> {
                     if (key.channel() instanceof ServerSocketChannel) {
                         ServerSocketChannel channel = (ServerSocketChannel) key.channel();
+                        Server server = (Server)key.attachment();
                         server.accept(channel);
                     }
                 });
@@ -65,7 +64,7 @@ public class NonBlockingSelectLoop implements SelectLoop {
     }
 
     @Override
-    public void configure() {
+    public void configure(Server server) {
         try {
             server.socket.configureBlocking(false);
         } catch (IOException ex) {
@@ -74,9 +73,9 @@ public class NonBlockingSelectLoop implements SelectLoop {
     }
 
     @Override
-    public void register(int selectionKey) {
+    public void register(Server server, int selectionKey) {
         try {
-            server.socket.register(selector, selectionKey);
+            server.socket.register(selector, selectionKey, server);
         } catch (ClosedChannelException ex) {
             throw new RuntimeException(ex);
         }
