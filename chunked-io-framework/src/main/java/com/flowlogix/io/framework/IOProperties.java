@@ -16,11 +16,14 @@ public class IOProperties {
         PORT,
         ACCEPT_BACKLOG,
         ACCEPTOR_POOL_SIZE,
+        USING_SELECT_LOOP,
+        SOCKET_TIMEOUT_IN_MILLIS,
     }
 
     private final Object properties[] = new Object[Props.values().length];
     private static final Logger log = Logger.getLogger(IOProperties.class.getName());
 
+    @SuppressWarnings("unchecked")
     public<T> T getProperty(Props propType) {
         Object rv = properties[propType.ordinal()];
         if (rv == null) {

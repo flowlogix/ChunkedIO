@@ -20,6 +20,8 @@ public class EchoServer {
         props.setProperty(IOProperties.Props.PORT, port);
         props.setProperty(IOProperties.Props.ACCEPTOR_POOL_SIZE, 5);
         props.setProperty(IOProperties.Props.ACCEPT_BACKLOG, 15);
+        props.setProperty(IOProperties.Props.SOCKET_TIMEOUT_IN_MILLIS, 100);
+        props.setProperty(IOProperties.Props.USING_SELECT_LOOP, false);
         System.out.println(props);
         this.server = new Server(props);
     }
