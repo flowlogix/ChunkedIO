@@ -7,6 +7,7 @@ package com.flowlogix.io.framework;
 
 import static com.flowlogix.io.framework.IOProperties.Props.SOCKET_TIMEOUT_IN_MILLIS;
 import java.net.SocketException;
+import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
 /**
@@ -50,7 +51,7 @@ public class BlockingSelectLoop implements SelectLoop {
         } catch (SocketException ex) {
             throw new RuntimeException(ex);
         }
-        Runnable runnable = submitInLoop(server.socket, () -> server.accept(server.socket));
+        Runnable runnable = submitInLoop(server.socket, () -> server.accept(server.socket), () -> true);
         if (!started) {
             queue.offer(runnable);
         } else {
@@ -59,16 +60,30 @@ public class BlockingSelectLoop implements SelectLoop {
     }
 
     @Override
-    public void registerReadWrite(Channel channel) {
-        transport.ioExec.submit(submitInLoop(channel.channel, channel::read));
-        transport.ioExec.submit(submitInLoop(channel.channel, channel::write));
+    public void registerRead(Channel channel) {
+        transport.ioExec.submit(submitInLoop(channel.channel, channel::read, () -> true));
     }
 
-    private Runnable submitInLoop(java.nio.channels.Channel channel, Runnable r) {
+    @Override
+    public void registerWrite(Channel channel) {
+        channel.setWriting(true);
+        transport.ioExec.submit(submitInLoop(channel.channel, channel::write, channel::isWriting));
+    }
+
+    @Override
+    public void unregisterWrite(Channel channel) {
+        channel.setWriting(false);
+    }
+
+    private Runnable submitInLoop(java.nio.channels.Channel channel, Runnable r, Callable<Boolean> resubmitCondition) {
         return Transport.logExceptions(() -> {
             r.run();
-            if (channel.isOpen()) {
-                transport.ioExec.submit(submitInLoop(channel, r));
+            try {
+                if (channel.isOpen() && resubmitCondition.call()) {
+                    transport.ioExec.submit(submitInLoop(channel, r, resubmitCondition));
+                }
+            } catch (Exception ex) {
+                throw new RuntimeException(ex);
             }
         });
     }

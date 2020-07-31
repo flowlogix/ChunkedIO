@@ -5,7 +5,6 @@
  */
 package com.flowlogix.io.framework;
 
-import static com.flowlogix.io.framework.IOProperties.Props.SOCKET_TIMEOUT_IN_MILLIS;
 import java.io.IOException;
 import java.net.StandardSocketOptions;
 import java.nio.BufferOverflowException;
@@ -13,7 +12,6 @@ import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
 import java.nio.charset.StandardCharsets;
 import java.util.concurrent.LinkedTransferQueue;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TransferQueue;
 
 /**
@@ -30,7 +28,7 @@ public class Channel {
     private StringBuilder readerMessageBuilder;
     private MessageHandler handler = (c, m) -> { throw new IllegalStateException("No Message Handler"); };
     private TransferQueue<String> writeQ = new LinkedTransferQueue<>();
-    private final long timeout;
+    private volatile boolean isWriting;
 
 
     Channel(Transport transport, SocketChannel channel) {
@@ -42,8 +40,7 @@ public class Channel {
         } catch (IOException ex) {
             throw new RuntimeException(ex);
         }
-        timeout = transport.props.getProperty(SOCKET_TIMEOUT_IN_MILLIS);
-        transport.selectLoop.registerReadWrite(this);
+        transport.selectLoop.registerRead(this);
     }
 
     void close() {
@@ -62,6 +59,7 @@ public class Channel {
     public void write(String message) {
         try {
             if (channel.isOpen()) {
+                transport.selectLoop.registerWrite(this);
                 writeQ.transfer(message);
             }
         } catch (InterruptedException ex) {
@@ -69,13 +67,19 @@ public class Channel {
         }
     }
 
+    void setWriting(boolean tf) {
+        isWriting = tf;
+    }
+
+    boolean isWriting() {
+        return isWriting;
+    }
+
     void write() {
         try {
             if (writeBuf == null) {
-                String message = writeQ.poll(timeout, TimeUnit.MILLISECONDS);
-                if (message != null) {
-                    writeBuf = StandardCharsets.UTF_8.encode(message);
-                }
+                String message = writeQ.take();
+                writeBuf = StandardCharsets.UTF_8.encode(message);
             }
             if (writeBuf != null) {
                 if (writeChunk == null) {
@@ -92,6 +96,7 @@ public class Channel {
                 if (!writeBuf.hasRemaining()) {
                     writeBuf.clear();
                     writeBuf = null;
+                    transport.selectLoop.unregisterWrite(this);
                 }
             }
         } catch (IOException | InterruptedException ex) {

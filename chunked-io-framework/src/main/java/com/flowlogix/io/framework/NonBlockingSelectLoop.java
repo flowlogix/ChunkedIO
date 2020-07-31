@@ -86,13 +86,28 @@ public class NonBlockingSelectLoop implements SelectLoop {
     }
 
     @Override
-    public void registerReadWrite(Channel channel) {
+    public void registerRead(Channel channel) {
         try {
             channel.channel.configureBlocking(false);
-            channel.channel.register(selector, SelectionKey.OP_READ | SelectionKey.OP_WRITE, channel);
+            channel.channel.register(selector, SelectionKey.OP_READ, channel);
             selector.wakeup();
         } catch (IOException ex) {
             throw new RuntimeException(ex);
         }
+    }
+
+    @Override
+    public void registerWrite(Channel channel) {
+        try {
+            channel.channel.register(selector, SelectionKey.OP_WRITE, channel);
+            selector.wakeup();
+        } catch (IOException ex) {
+            throw new RuntimeException(ex);
+        }
+    }
+
+    @Override
+    public void unregisterWrite(Channel channel) {
+        channel.channel.keyFor(selector).interestOps(SelectionKey.OP_READ);
     }
 }
