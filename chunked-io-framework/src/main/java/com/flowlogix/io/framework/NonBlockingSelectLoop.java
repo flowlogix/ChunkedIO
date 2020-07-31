@@ -12,6 +12,8 @@ import java.nio.channels.Selector;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
 import java.nio.channels.spi.SelectorProvider;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  *
@@ -21,6 +23,7 @@ public class NonBlockingSelectLoop implements SelectLoop {
     private final Selector selector;
     private volatile boolean started;
     private final Thread selectLoopThread = new Thread(logExceptions(this::run), "SelectLoop");
+    private static final Logger log = Logger.getLogger(NonBlockingSelectLoop.class.getName());
 
 
     public NonBlockingSelectLoop() {
@@ -35,20 +38,24 @@ public class NonBlockingSelectLoop implements SelectLoop {
         try {
             while (started) {
                 selector.select(key -> {
-                    if (key.channel() instanceof ServerSocketChannel) {
-                        ServerSocketChannel channel = (ServerSocketChannel) key.channel();
-                        Server server = (Server)key.attachment();
-                        server.accept(channel);
-                    }
+                    try {
+                        if (key.channel() instanceof ServerSocketChannel) {
+                            ServerSocketChannel channel = (ServerSocketChannel) key.channel();
+                            Server server = (Server) key.attachment();
+                            server.accept(channel);
+                        }
 
-                    if (key.channel() instanceof SocketChannel) {
-                        Channel channel = (Channel)key.attachment();
-                        if (key.isValid() && key.isReadable()) {
-                            channel.read();
+                        if (key.channel() instanceof SocketChannel) {
+                            Channel channel = (Channel) key.attachment();
+                            if (key.isValid() && key.isReadable()) {
+                                channel.read();
+                            }
+                            if (key.isValid() && key.isWritable()) {
+                                channel.write();
+                            }
                         }
-                        if (key.isValid() && key.isWritable()) {
-                            channel.write();
-                        }
+                    } catch (Exception ex) {
+                        log.log(Level.WARNING, "SelectLoop Exception", ex);
                     }
                 });
             }

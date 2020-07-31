@@ -47,9 +47,8 @@ public class Transport {
 
     public void stop() {
         selectLoop.stop();
-        selectLoop.stop();
         ioExec.shutdown();
-        processorExec.shutdown();
+        processorExec.shutdownNow();
     }
 
     static Runnable logExceptions(Runnable r) {

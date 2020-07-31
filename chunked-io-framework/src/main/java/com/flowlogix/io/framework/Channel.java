@@ -5,6 +5,7 @@
  */
 package com.flowlogix.io.framework;
 
+import com.flowlogix.io.framework.BlockingSelectLoop.LoopControl;
 import java.io.IOException;
 import java.net.StandardSocketOptions;
 import java.nio.BufferOverflowException;
@@ -13,12 +14,14 @@ import java.nio.channels.SocketChannel;
 import java.nio.charset.StandardCharsets;
 import java.util.concurrent.LinkedTransferQueue;
 import java.util.concurrent.TransferQueue;
+import java.util.logging.Logger;
 
 /**
  *
  * @author lprimak
  */
 public class Channel {
+    private static final Logger log = Logger.getLogger(Channel.class.getName());
     final SocketChannel channel;
     private final Transport transport;
     private final ByteBuffer readBuf;
@@ -29,7 +32,7 @@ public class Channel {
     private final MessageHandler handler;
     private TransferQueue<String> writeQ = new LinkedTransferQueue<>();
     private volatile boolean isWriting;
-
+    final LoopControl writeLoopControl = new WriteLoopControl();
 
     Channel(Transport transport, MessageHandler messageHandler, SocketChannel channel) {
         this.channel = channel;
@@ -59,7 +62,9 @@ public class Channel {
                 writeQ.transfer(message);
             }
         } catch (InterruptedException ex) {
-            throw new RuntimeException(ex);
+            if (channel.isOpen()) {
+                throw new RuntimeException(ex);
+            }
         }
     }
 
@@ -132,6 +137,25 @@ public class Channel {
             readerMessageBuilder = null;
         } catch (IOException | BufferOverflowException ex) {
             throw new RuntimeException(ex);
+        }
+    }
+
+    private class WriteLoopControl implements LoopControl {
+        private volatile boolean isRunning;
+
+        @Override
+        public boolean resubmit() {
+            return isWriting;
+        }
+
+        @Override
+        public void setRunning(boolean tf) {
+            isRunning = tf;
+        }
+
+        @Override
+        public boolean isRunning() {
+            return isRunning;
         }
     }
 }
