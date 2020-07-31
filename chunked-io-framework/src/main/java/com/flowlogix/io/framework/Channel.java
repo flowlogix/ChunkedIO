@@ -14,6 +14,7 @@ import java.nio.channels.SocketChannel;
 import java.nio.charset.StandardCharsets;
 import java.util.concurrent.LinkedTransferQueue;
 import java.util.concurrent.TransferQueue;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Logger;
 
 /**
@@ -31,7 +32,7 @@ public class Channel {
     private StringBuilder readerMessageBuilder;
     private final MessageHandler handler;
     private TransferQueue<String> writeQ = new LinkedTransferQueue<>();
-    private volatile boolean isWriting;
+    final AtomicInteger writingCount = new AtomicInteger();
     final LoopControl writeLoopControl = new WriteLoopControl();
 
     Channel(Transport transport, MessageHandler messageHandler, SocketChannel channel) {
@@ -50,6 +51,7 @@ public class Channel {
     void close() {
         try {
             channel.close();
+            writeQ.clear();
         } catch (IOException ex) {
             throw new RuntimeException(ex);
         }
@@ -68,17 +70,9 @@ public class Channel {
         }
     }
 
-    void setWriting(boolean tf) {
-        isWriting = tf;
-    }
-
-    boolean isWriting() {
-        return isWriting;
-    }
-
     void write() {
         try {
-            if (writeBuf == null) {
+            if (writeBuf == null && channel.isOpen()) {
                 String message = writeQ.take();
                 writeBuf = StandardCharsets.UTF_8.encode(message);
             }
@@ -109,7 +103,7 @@ public class Channel {
         try {
             int readVal = channel.read(readBuf);
             if (readVal == -1) {
-                channel.close();
+                close();
                 return;
             }
             if (!readBuf.hasRemaining()) {
@@ -136,6 +130,7 @@ public class Channel {
             readBuf.clear();
             readerMessageBuilder = null;
         } catch (IOException | BufferOverflowException ex) {
+            close();
             throw new RuntimeException(ex);
         }
     }
@@ -145,7 +140,7 @@ public class Channel {
 
         @Override
         public boolean resubmit() {
-            return isWriting;
+            return writingCount.get() > 0;
         }
 
         @Override

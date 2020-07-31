@@ -66,7 +66,7 @@ public class BlockingSelectLoop implements SelectLoop {
 
     @Override
     public void registerWrite(Channel channel) {
-        channel.setWriting(true);
+        channel.writingCount.incrementAndGet();
         if (!channel.writeLoopControl.isRunning()) {
             transport.ioExec.submit(submitInLoop(channel.channel, channel::write, channel.writeLoopControl));
         }
@@ -74,7 +74,7 @@ public class BlockingSelectLoop implements SelectLoop {
 
     @Override
     public void unregisterWrite(Channel channel) {
-        channel.setWriting(false);
+        channel.writingCount.decrementAndGet();
     }
 
     interface LoopControl {
