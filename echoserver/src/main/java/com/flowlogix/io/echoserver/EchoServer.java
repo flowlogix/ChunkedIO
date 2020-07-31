@@ -5,6 +5,7 @@
  */
 package com.flowlogix.io.echoserver;
 
+import com.flowlogix.io.framework.Channel;
 import com.flowlogix.io.framework.IOProperties;
 import com.flowlogix.io.framework.Server;
 import com.flowlogix.io.framework.Transport;
@@ -24,7 +25,8 @@ public class EchoServer {
         props.setProperty(IOProperties.Props.USING_SELECT_LOOP, false);
         System.out.println(props);
         this.transport = new Transport(props);
-        this.server = new Server(transport, 7777);
+        this.server = new Server(transport, 7777,
+                (Channel channel, String msg) -> channel.write(msg));
     }
 
 

@@ -9,6 +9,7 @@ import static com.flowlogix.io.framework.IOProperties.Props.USING_SELECT_LOOP;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.nio.channels.AsynchronousCloseException;
+import java.nio.channels.ClosedChannelException;
 import java.nio.channels.ClosedSelectorException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -59,7 +60,8 @@ public class Transport {
                 StringWriter sw = new StringWriter();
                 PrintWriter pw = new PrintWriter(sw);
                 t.printStackTrace(pw);
-                if (t.getCause() instanceof AsynchronousCloseException || t instanceof ClosedSelectorException) {
+                if (t.getCause() instanceof AsynchronousCloseException || t instanceof ClosedSelectorException
+                        || t.getCause() instanceof ClosedChannelException) {
                     log.fine(sw.toString());
                 } else {
                     log.severe(sw.toString());

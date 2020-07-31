@@ -24,10 +24,12 @@ public class Server {
     private final Transport transport;
     private final int port;
     private final ConcurrentLinkedQueue<Channel> channels = new ConcurrentLinkedQueue<>();
+    private final MessageHandler messageHandler;
 
-    public Server(Transport transport, int port) {
+    public Server(Transport transport, int port, MessageHandler messageHandler) {
         this.transport = transport;
         this.port = port;
+        this.messageHandler = messageHandler;
         try {
             socket = ServerSocketChannel.open();
             socket.setOption(StandardSocketOptions.SO_REUSEADDR, true);
@@ -38,7 +40,7 @@ public class Server {
 
     void accept(ServerSocketChannel channel) {
         try {
-            channels.add(new Channel(transport, channel.socket().accept().getChannel()));
+            channels.add(new Channel(transport, channel.socket().accept().getChannel()).setHandler(messageHandler));
         } catch (SocketTimeoutException ex) {
         } catch (IOException ex) {
             throw new RuntimeException(ex);
