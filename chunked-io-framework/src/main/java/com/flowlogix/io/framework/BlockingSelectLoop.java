@@ -46,7 +46,7 @@ public class BlockingSelectLoop implements SelectLoop {
     @Override
     public void registerAccept(Server server) {
         try {
-            server.socket.socket().setSoTimeout(transport.props.getProperty(SOCKET_TIMEOUT_IN_MILLIS));
+            server.socket.socket().setSoTimeout(transport.props.<Long>getProperty(SOCKET_TIMEOUT_IN_MILLIS).intValue());
         } catch (SocketException ex) {
             throw new RuntimeException(ex);
         }
@@ -59,8 +59,9 @@ public class BlockingSelectLoop implements SelectLoop {
     }
 
     @Override
-    public void registerRead(Channel channel) {
+    public void registerReadWrite(Channel channel) {
         transport.ioExec.submit(submitInLoop(channel.channel, channel::read));
+        transport.ioExec.submit(submitInLoop(channel.channel, channel::write));
     }
 
     private Runnable submitInLoop(java.nio.channels.Channel channel, Runnable r) {

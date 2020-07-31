@@ -35,6 +35,10 @@ public class IOProperties {
         return this;
     }
 
+    boolean exists(Props propType) {
+        return properties[propType.ordinal()] != null;
+    }
+
     @Override
     public String toString() {
         StringBuilder sb = new StringBuilder("IOProperties - [");

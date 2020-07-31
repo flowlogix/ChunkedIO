@@ -43,7 +43,12 @@ public class NonBlockingSelectLoop implements SelectLoop {
 
                     if (key.channel() instanceof SocketChannel) {
                         Channel channel = (Channel)key.attachment();
-                        channel.read();
+                        if (key.isValid() && key.isReadable()) {
+                            channel.read();
+                        }
+                        if (key.isValid() && key.isWritable()) {
+                            channel.write();
+                        }
                     }
                 });
             }
@@ -81,10 +86,10 @@ public class NonBlockingSelectLoop implements SelectLoop {
     }
 
     @Override
-    public void registerRead(Channel channel) {
+    public void registerReadWrite(Channel channel) {
         try {
             channel.channel.configureBlocking(false);
-            channel.channel.register(selector, SelectionKey.OP_READ, channel);
+            channel.channel.register(selector, SelectionKey.OP_READ | SelectionKey.OP_WRITE, channel);
             selector.wakeup();
         } catch (IOException ex) {
             throw new RuntimeException(ex);
