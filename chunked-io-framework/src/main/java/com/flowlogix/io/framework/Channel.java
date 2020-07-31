@@ -26,12 +26,12 @@ public class Channel {
     private ByteBuffer writeChunk;
     private final int writeChunkSize;
     private StringBuilder readerMessageBuilder;
-    private MessageHandler handler = (c, m) -> { throw new IllegalStateException("No Message Handler"); };
+    private final MessageHandler handler;
     private TransferQueue<String> writeQ = new LinkedTransferQueue<>();
     private volatile boolean isWriting;
 
 
-    Channel(Transport transport, SocketChannel channel) {
+    Channel(Transport transport, MessageHandler messageHandler, SocketChannel channel) {
         this.channel = channel;
         this.transport = transport;
         try {
@@ -40,6 +40,7 @@ public class Channel {
         } catch (IOException ex) {
             throw new RuntimeException(ex);
         }
+        this.handler = messageHandler;
         transport.selectLoop.registerRead(this);
     }
 
@@ -49,11 +50,6 @@ public class Channel {
         } catch (IOException ex) {
             throw new RuntimeException(ex);
         }
-    }
-
-    public Channel setHandler(MessageHandler handler) {
-        this.handler = handler;
-        return this;
     }
 
     public void write(String message) {
