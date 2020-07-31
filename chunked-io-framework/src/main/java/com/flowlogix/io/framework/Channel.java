@@ -38,7 +38,7 @@ public class Channel {
         this.transport = transport;
         try {
             readBuf = ByteBuffer.allocateDirect(channel.getOption(StandardSocketOptions.SO_RCVBUF));
-            writeChunkSize = 5; //channel.getOption(StandardSocketOptions.SO_SNDBUF);
+            writeChunkSize = channel.getOption(StandardSocketOptions.SO_SNDBUF);
         } catch (IOException ex) {
             throw new RuntimeException(ex);
         }
