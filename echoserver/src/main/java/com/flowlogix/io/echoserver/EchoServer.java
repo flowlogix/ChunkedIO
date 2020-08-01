@@ -20,7 +20,7 @@ public class EchoServer {
     private final IOProperties props = new IOProperties();
 
     EchoServer(int port) {
-        props.setProperty(IOProperties.Props.ACCEPT_BACKLOG, 15);
+        props.setProperty(IOProperties.Props.ACCEPT_BACKLOG, 4096);
         props.setProperty(IOProperties.Props.SOCKET_TIMEOUT_IN_MILLIS, 100L);
         props.setProperty(IOProperties.Props.USING_SELECT_LOOP, false);
         System.out.println(props);
