@@ -51,7 +51,7 @@ public class Channel {
     void close() {
         try {
             channel.close();
-            while(writeQ.poll() != null) {}
+            writeQ.clear();
         } catch (IOException ex) {
             throw new RuntimeException(ex);
         }
@@ -142,4 +142,3 @@ public class Channel {
         return true;
     }
 }
-
