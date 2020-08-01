@@ -80,8 +80,7 @@ public class Channel {
             if (writeBuf == null && channel.isOpen()) {
                 String message = writeQ.take();
                 writeBuf = StandardCharsets.UTF_8.encode(message);
-            }
-            if (writeBuf != null) {
+            } else if (writeBuf != null) {
                 if (writeChunk == null) {
                     int nextChunk = Math.min(writeBuf.remaining(), writeChunkSize);
                     int position = writeBuf.position();
@@ -98,6 +97,8 @@ public class Channel {
                     writeBuf = null;
                     recurse = transport.selectLoop.unregisterWrite(this);
                 }
+            } else { // channel closed
+                close();
             }
         } catch (IOException | InterruptedException ex) {
             throw new RuntimeException(ex);
