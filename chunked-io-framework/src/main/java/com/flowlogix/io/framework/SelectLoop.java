@@ -15,5 +15,5 @@ interface SelectLoop {
     void registerAccept(Server server);
     void registerRead(Channel channel);
     void registerWrite(Channel channel);
-    void unregisterWrite(Channel aThis);
+    boolean unregisterWrite(Channel aThis);
 }

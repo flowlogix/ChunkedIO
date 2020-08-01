@@ -11,6 +11,7 @@ import java.io.StringWriter;
 import java.nio.channels.AsynchronousCloseException;
 import java.nio.channels.ClosedChannelException;
 import java.nio.channels.ClosedSelectorException;
+import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -56,16 +57,31 @@ public class Transport {
             try {
                 r.run();
             } catch (Throwable t) {
-                StringWriter sw = new StringWriter();
-                PrintWriter pw = new PrintWriter(sw);
-                t.printStackTrace(pw);
-                if (t.getCause() instanceof AsynchronousCloseException || t instanceof ClosedSelectorException
-                        || t.getCause() instanceof ClosedChannelException) {
-                    log.fine(sw.toString());
-                } else {
-                    log.severe(sw.toString());
-                }
+                logException(t);
             }
         };
+    }
+
+    static<T> Callable<T> logExceptions(Callable<T> r) {
+        return () -> {
+            try {
+                return r.call();
+            } catch (Throwable t) {
+                logException(t);
+            }
+            return null;
+        };
+    }
+
+    static private void logException(Throwable t) {
+        StringWriter sw = new StringWriter();
+        PrintWriter pw = new PrintWriter(sw);
+        t.printStackTrace(pw);
+        if (t.getCause() instanceof AsynchronousCloseException || t instanceof ClosedSelectorException
+                || t.getCause() instanceof ClosedChannelException) {
+            log.fine(sw.toString());
+        } else {
+            log.severe(sw.toString());
+        }
     }
 }

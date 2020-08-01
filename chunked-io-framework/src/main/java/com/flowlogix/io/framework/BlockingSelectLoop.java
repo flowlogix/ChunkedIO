@@ -7,35 +7,37 @@ package com.flowlogix.io.framework;
 
 import static com.flowlogix.io.framework.IOProperties.Props.SOCKET_TIMEOUT_IN_MILLIS;
 import java.net.SocketException;
+import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.logging.Logger;
 
 /**
  *
  * @author lprimak
  */
 public class BlockingSelectLoop implements SelectLoop {
+    private static final Logger log = Logger.getLogger(BlockingSelectLoop.class.getName());
     private final Transport transport;
     private volatile boolean started;
-    private final ConcurrentLinkedQueue<Runnable> queue = new ConcurrentLinkedQueue<>();
-    private static final LoopControl noopLoopControl = new LoopControl() { };
+    private final ConcurrentLinkedQueue<Callable<Boolean>> queue = new ConcurrentLinkedQueue<>();
 
     public BlockingSelectLoop(Transport transport) {
         this.transport = transport;
     }
 
-    private void run(Runnable runnable) {
-        transport.ioExec.submit(Transport.logExceptions(runnable));
+    private void run(Callable<Boolean> callable) {
+        transport.ioExec.submit(Transport.logExceptions(callable));
     }
 
     @Override
     public void start() {
         started = true;
         while (started) {
-            Runnable runnable = queue.poll();
-            if (runnable == null) {
+            Callable<Boolean> callable = queue.poll();
+            if (callable == null) {
                 break;
             }
-            run(runnable);
+            run(callable);
         }
     }
 
@@ -51,51 +53,38 @@ public class BlockingSelectLoop implements SelectLoop {
         } catch (SocketException ex) {
             throw new RuntimeException(ex);
         }
-        Runnable runnable = submitInLoop(server.socket, () -> server.accept(server.socket), noopLoopControl);
+        Callable<Boolean> callable = submitInLoop(server.socket, () -> server.accept(server.socket));
         if (!started) {
-            queue.offer(runnable);
+            queue.offer(callable);
         } else {
-            run(runnable);
+            run(callable);
         }
     }
 
     @Override
     public void registerRead(Channel channel) {
-        transport.ioExec.submit(submitInLoop(channel.channel, channel::read, noopLoopControl));
+        transport.ioExec.submit(submitInLoop(channel.channel, channel::read));
     }
 
     @Override
     public void registerWrite(Channel channel) {
-        channel.writingCount.incrementAndGet();
-        if (!channel.writeLoopControl.isRunning()) {
-            transport.ioExec.submit(submitInLoop(channel.channel, channel::write, channel.writeLoopControl));
+        if (channel.requestedWriteCount.incrementAndGet() == 1) {
+            transport.ioExec.submit(submitInLoop(channel.channel, channel::write));
         }
     }
 
     @Override
-    public void unregisterWrite(Channel channel) {
-        channel.writingCount.decrementAndGet();
+    public boolean unregisterWrite(Channel channel) {
+        return channel.requestedWriteCount.decrementAndGet() != 0;
     }
 
-    interface LoopControl {
-        default boolean resubmit() { return true; }
-        default void setRunning(boolean tf) { }
-        default boolean isRunning() { return false; }
-    }
-
-    private Runnable submitInLoop(java.nio.channels.Channel channel, Runnable r, LoopControl loopControl) {
-        loopControl.setRunning(true);
+    private Callable<Boolean> submitInLoop(java.nio.channels.Channel channel, Callable<Boolean> callable) {
         return Transport.logExceptions(() -> {
-            r.run();
-            try {
-                if (channel.isOpen() && loopControl.resubmit()) {
-                    transport.ioExec.submit(submitInLoop(channel, r, loopControl));
-                } else {
-                    loopControl.setRunning(false);
-                }
-            } catch (Exception ex) {
-                throw new RuntimeException(ex);
+            boolean resubmit = callable.call();
+            if (resubmit && channel.isOpen()) {
+                transport.ioExec.submit(submitInLoop(channel, callable));
             }
+            return resubmit;
         });
     }
 }
