@@ -169,6 +169,9 @@ void* do_connect()
 				pthread_mutex_lock(&g_mutex);
 				nsuccess ++;
 				pthread_mutex_unlock(&g_mutex);
+			} else {
+				printf("got this(bad): %s\n", buffer);
+				printf("expected this: %s\n", message);
 			}
 		}
 
