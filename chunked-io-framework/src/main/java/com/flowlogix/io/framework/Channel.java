@@ -62,7 +62,7 @@ public class Channel {
             if (channel.isOpen()) {
                 transport.selectLoop.registerWrite(this);
                 if (!writeQ.tryTransfer(message, 5, TimeUnit.SECONDS)) {
-                    close();
+                    transport.selectLoop.unregisterWrite(this);
                     throw new IllegalStateException(String.format("Timed Out Writing, writeCount = %d, queue size: %d, channel = %s",
                             requestedWriteCount.get(), writeQ.size(), System.identityHashCode(this)));
                 }
