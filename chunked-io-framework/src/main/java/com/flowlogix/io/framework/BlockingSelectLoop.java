@@ -53,7 +53,7 @@ public class BlockingSelectLoop implements SelectLoop {
         } catch (SocketException ex) {
             throw new RuntimeException(ex);
         }
-        Callable<Boolean> callable = submitInLoop(server.socket, () -> server.accept(server.socket));
+        Callable<Boolean> callable = submitInLoop(server.socket, () -> server.accept(server.socket), server.socket::isOpen);
         if (!started) {
             queue.offer(callable);
         } else {
@@ -63,13 +63,13 @@ public class BlockingSelectLoop implements SelectLoop {
 
     @Override
     public void registerRead(Channel channel) {
-        transport.ioExec.submit(submitInLoop(channel.channel, channel::read));
+        transport.ioExec.submit(submitInLoop(channel.channel, channel::read, channel.channel::isOpen));
     }
 
     @Override
     public void registerWrite(Channel channel) {
         if (channel.requestedWriteCount.incrementAndGet() == 1) {
-            transport.ioExec.submit(submitInLoop(channel.channel, channel::write));
+            transport.ioExec.submit(submitInLoop(channel.channel, channel::write, channel.channel::isOpen));
         }
     }
 
@@ -78,11 +78,12 @@ public class BlockingSelectLoop implements SelectLoop {
         return channel.requestedWriteCount.decrementAndGet() != 0;
     }
 
-    private Callable<Boolean> submitInLoop(java.nio.channels.Channel channel, Callable<Boolean> callable) {
+    private<ChannelType> Callable<Boolean> submitInLoop(ChannelType channel, Callable<Boolean> callable,
+            Callable<Boolean> isOpenFn) {
         return Transport.logExceptions(() -> {
             boolean resubmit = callable.call();
-            if (resubmit && channel.isOpen()) {
-                transport.ioExec.submit(submitInLoop(channel, callable));
+            if (resubmit && isOpenFn.call()) {
+                transport.ioExec.submit(submitInLoop(channel, callable, isOpenFn));
             }
             return resubmit;
         });
