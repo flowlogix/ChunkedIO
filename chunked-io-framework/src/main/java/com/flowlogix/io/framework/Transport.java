@@ -84,4 +84,11 @@ public class Transport {
             log.severe(sw.toString());
         }
     }
+
+    void checkSocket(Object socket) {
+        if (selectLoop instanceof BlockingSelectLoop && !socket.getClass()
+                .getSimpleName().endsWith("WithBlockingDisabled")) {
+            throw new IllegalStateException("High Performance Chunked I/O mode cannot run without patched NIO module");
+        }
+    }
 }

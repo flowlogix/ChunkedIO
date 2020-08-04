@@ -33,6 +33,7 @@ public class Server {
         try {
             socket = ServerSocketChannel.open();
             socket.setOption(StandardSocketOptions.SO_REUSEADDR, true);
+            transport.checkSocket(socket);
         } catch (IOException ex) {
             throw new RuntimeException(ex);
         }

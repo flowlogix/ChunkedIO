@@ -5,8 +5,6 @@
  */
 package com.flowlogix.io.framework;
 
-import static com.flowlogix.io.framework.IOProperties.Props.SOCKET_TIMEOUT_IN_MILLIS;
-import java.net.SocketException;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.logging.Logger;
@@ -48,11 +46,6 @@ public class BlockingSelectLoop implements SelectLoop {
 
     @Override
     public void registerAccept(Server server) {
-        try {
-            server.socket.socket().setSoTimeout(transport.props.<Long>getProperty(SOCKET_TIMEOUT_IN_MILLIS).intValue());
-        } catch (SocketException ex) {
-            throw new RuntimeException(ex);
-        }
         Callable<Boolean> callable = submitInLoop(server.socket, () -> server.accept(server.socket), server.socket::isOpen);
         if (!started) {
             queue.offer(callable);
