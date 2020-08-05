@@ -41,7 +41,7 @@ public class Server {
 
     boolean accept(ServerSocketChannel channel) {
         try {
-            channels.add(new Channel(transport, messageHandler, channel.socket().accept().getChannel()));
+            channels.add(new Channel(transport, messageHandler, channel.accept()));
         } catch (SocketTimeoutException ex) {
         } catch (IOException ex) {
             throw new RuntimeException(ex);
