@@ -63,7 +63,14 @@ public class BlockingSelectLoop implements SelectLoop {
 
     @Override
     public void registerRead(Channel channel) {
-        transport.ioExec.submit(submitInLoop(channel.channel, channel::read, channel.channel::isOpen));
+        if (channel.requestedReadCount.incrementAndGet() == 1) {
+            transport.ioExec.submit(submitInLoop(channel.channel, channel::read, channel.channel::isOpen));
+        }
+    }
+
+    @Override
+    public boolean unregisterRead(Channel channel) {
+        return channel.requestedReadCount.decrementAndGet() != 0;
     }
 
     @Override

@@ -104,6 +104,13 @@ public class NonBlockingSelectLoop implements SelectLoop {
     }
 
     @Override
+    public boolean unregisterRead(Channel channel) {
+        channel.channel.keyFor(selector).interestOps(SelectionKey.OP_READ).cancel();
+        selector.wakeup();
+        return false;
+    }
+
+    @Override
     public void registerWrite(Channel channel) {
         try {
             channel.channel.register(selector, SelectionKey.OP_WRITE, channel);
@@ -115,7 +122,8 @@ public class NonBlockingSelectLoop implements SelectLoop {
 
     @Override
     public boolean unregisterWrite(Channel channel) {
-        channel.channel.keyFor(selector).interestOps(SelectionKey.OP_READ);
+        channel.channel.keyFor(selector).interestOps(SelectionKey.OP_WRITE).cancel();
+        selector.wakeup();
         return false;
     }
 

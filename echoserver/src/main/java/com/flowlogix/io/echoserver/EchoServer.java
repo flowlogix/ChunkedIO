@@ -26,7 +26,10 @@ public class EchoServer {
         System.out.println(props);
         this.transport = new Transport(props);
         this.server = new Server(transport, 7777,
-                (Channel channel, String msg) -> channel.write(msg));
+                (Channel channel, String msg) -> {
+                    channel.write(msg);
+                    channel.scheduleRead();
+                });
     }
 
 

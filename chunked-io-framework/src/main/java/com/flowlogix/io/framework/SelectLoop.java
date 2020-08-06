@@ -14,6 +14,7 @@ interface SelectLoop {
     void stop();
     void registerAccept(Server server);
     void registerRead(Channel channel);
+    boolean unregisterRead(Channel channel);
     void registerWrite(Channel channel);
     boolean unregisterWrite(Channel channel);
     boolean isBlocking();

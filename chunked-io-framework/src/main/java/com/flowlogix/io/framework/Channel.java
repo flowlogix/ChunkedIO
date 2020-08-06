@@ -32,6 +32,7 @@ public class Channel {
     private StringBuilder readerMessageBuilder;
     private final MessageHandler handler;
     private TransferQueue<String> writeQ = new LinkedTransferQueue<>();
+    final AtomicInteger requestedReadCount = new AtomicInteger();
     final AtomicInteger requestedWriteCount = new AtomicInteger();
 
 
@@ -54,6 +55,12 @@ public class Channel {
             writeQ.clear();
         } catch (IOException ex) {
             throw new RuntimeException(ex);
+        }
+    }
+
+    public void scheduleRead() {
+        if (channel.isOpen()) {
+            transport.selectLoop.registerRead(this);
         }
     }
 
@@ -107,6 +114,7 @@ public class Channel {
     }
 
     boolean read() {
+        boolean recurse = true;
         try {
             int readVal = channel.read(readBuf);
             if (readVal == -1) {
@@ -136,10 +144,11 @@ public class Channel {
             transport.processorExec.submit(Transport.logExceptions(() -> handler.onMessage(this, message)));
             readBuf.clear();
             readerMessageBuilder = null;
+            recurse = transport.selectLoop.unregisterRead(this);
         } catch (IOException | BufferOverflowException ex) {
             close();
             throw new RuntimeException(ex);
         }
-        return true;
+        return recurse;
     }
 }
