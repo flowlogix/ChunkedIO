@@ -15,7 +15,7 @@ import java.net.InetSocketAddress;
  *
  * @author lprimak
  */
-public class SocketChannelImplWithBlockingDisabled extends SocketChannelImpl {
+class SocketChannelImplWithBlockingDisabled extends SocketChannelImpl {
     SocketChannelImplWithBlockingDisabled(SelectorProvider sp) throws IOException {
         super(sp);
     }

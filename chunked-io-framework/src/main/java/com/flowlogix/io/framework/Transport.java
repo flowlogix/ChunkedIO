@@ -91,10 +91,10 @@ public class Transport {
 
     void setHighPerformance(NetworkChannel socket) throws IOException {
         if (selectLoop.isBlocking()) {
-            if (!socket.getOption(useHighPerformanceSockets)) {
-                throw new IllegalStateException("High Performance Chunked I/O mode cannot run without patched NIO module");
-            } else {
+            try {
                 socket.setOption(useHighPerformanceSockets, true);
+            } catch (UnsupportedOperationException e) {
+                throw new IllegalStateException("High Performance Chunked I/O mode cannot run without patched NIO module", e);
             }
         }
     }

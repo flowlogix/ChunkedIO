@@ -5,6 +5,7 @@
  */
 package sun.nio.ch;
 
+import com.flowlogix.nio.ch.GetSetOptions;
 import java.io.IOException;
 import java.nio.channels.SocketChannel;
 import java.nio.channels.ServerSocketChannel;
@@ -21,9 +22,8 @@ import java.lang.invoke.VarHandle;
  *
  * @author lprimak
  */
-public class ServerSocketChannelImplWithBlockingDisabled extends ServerSocketChannelImpl {
+class ServerSocketChannelImplWithBlockingDisabled extends ServerSocketChannelImpl {
     private static final NativeDispatcher nd = new SocketDispatcher();
-    private static final String highPerformanceOptionName = "UseHighPerformanceSockets";
     private static final VarHandle fdHandle;
     private static final VarHandle familyHandle;
     private static final VarHandle stateHandle;
@@ -65,22 +65,14 @@ public class ServerSocketChannelImplWithBlockingDisabled extends ServerSocketCha
     public <T> T getOption(SocketOption<T> name)
         throws IOException
     {
-        if (name.name().equals(this.highPerformanceOptionName)) {
-            return (T)Boolean.TRUE;
-        } else {
-            return super.getOption(name);
-        }
+        return GetSetOptions.getOption(name, () -> useHighPerformance, super::getOption);
     }
 
     @Override
     public <T> ServerSocketChannel setOption(SocketOption<T> name, T value)
         throws IOException {
-        if (name.name().equals(this.highPerformanceOptionName)) {
-            this.useHighPerformance = (Boolean)value;
-            return this;
-        } else {
-            return super.setOption(name, value);
-        }
+        GetSetOptions.setOption(name, value, (tf) -> useHighPerformance = tf, super::setOption);
+        return this;
     }
 
     @Override
