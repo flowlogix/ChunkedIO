@@ -33,6 +33,7 @@ public class Transport {
     private final AtomicInteger processorThreadCount = new AtomicInteger();
     final SelectLoop selectLoop;
     private static final SocketOption<Boolean> useHighPerformanceSockets = new HighPerformanceSocketImpl();
+    private final ThreadWalkerInterruptor threadWalker = new ThreadWalkerInterruptor(this);
 
 
     public Transport(IOProperties props) {
@@ -48,12 +49,18 @@ public class Transport {
 
     public void start() {
         selectLoop.start();
+        if (selectLoop.isBlocking()) {
+            threadWalker.start();
+        }
     }
 
     public void stop() {
         selectLoop.stop();
         ioExec.shutdown();
         processorExec.shutdown();
+        if (selectLoop.isBlocking()) {
+            threadWalker.stop();
+        }
     }
 
     static Runnable logExceptions(Runnable r) {
@@ -66,12 +73,18 @@ public class Transport {
         };
     }
 
-    static<T> Callable<T> logExceptions(Callable<T> r) {
+    <T> Callable<T> logExceptions(Callable<T> r) {
         return () -> {
+            ThreadWalkerInterruptor.TaskTime taskTime = null;
             try {
+                taskTime = threadWalker.addTask(Thread.currentThread());
                 return r.call();
+            } catch (InterruptedException e) {
+                Thread.interrupted();
             } catch (Throwable t) {
                 logException(t);
+            } finally {
+                taskTime.taskFinished();
             }
             return null;
         };
