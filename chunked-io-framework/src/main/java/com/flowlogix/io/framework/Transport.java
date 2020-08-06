@@ -6,11 +6,14 @@
 package com.flowlogix.io.framework;
 
 import static com.flowlogix.io.framework.IOProperties.Props.USING_SELECT_LOOP;
+import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.StringWriter;
+import java.net.SocketOption;
 import java.nio.channels.AsynchronousCloseException;
 import java.nio.channels.ClosedChannelException;
 import java.nio.channels.ClosedSelectorException;
+import java.nio.channels.NetworkChannel;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -29,6 +32,7 @@ public class Transport {
     private final AtomicInteger ioThreadCount = new AtomicInteger();
     private final AtomicInteger processorThreadCount = new AtomicInteger();
     final SelectLoop selectLoop;
+    private static final SocketOption<Boolean> useHighPerformanceSockets = new HighPerformanceSocketImpl();
 
 
     public Transport(IOProperties props) {
@@ -85,10 +89,34 @@ public class Transport {
         }
     }
 
-    void checkSocket(Object socket) {
-        if (selectLoop instanceof BlockingSelectLoop && !socket.getClass()
-                .getSimpleName().endsWith("WithBlockingDisabled")) {
-            throw new IllegalStateException("High Performance Chunked I/O mode cannot run without patched NIO module");
+    void setHighPerformance(NetworkChannel socket) {
+        if (selectLoop instanceof BlockingSelectLoop) {
+            try {
+                if (!socket.getOption(useHighPerformanceSockets)) {
+                    throw new IllegalStateException("High Performance Chunked I/O mode cannot run without patched NIO module");
+                } else {
+                    socket.setOption(useHighPerformanceSockets, true);
+                }
+            } catch (IOException ex) {
+                throw new RuntimeException(ex);
+            }
+        }
+    }
+
+    private static class HighPerformanceSocketImpl implements SocketOption<Boolean> {
+        @Override
+        public String name() {
+            return "UseHighPerformanceSockets";
+        }
+
+        @Override
+        public Class<Boolean> type() {
+            return Boolean.class;
+        }
+
+        @Override
+        public String toString() {
+            return name();
         }
     }
 }

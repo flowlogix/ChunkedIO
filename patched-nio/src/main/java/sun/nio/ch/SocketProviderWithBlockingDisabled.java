@@ -17,12 +17,12 @@ import java.nio.channels.SocketChannel;
 public class SocketProviderWithBlockingDisabled extends KQueueSelectorProvider {
     @Override
     public SocketChannel openSocketChannel() throws IOException {
-        return new sun.nio.ch.SocketChannelImpl(this);
+        return new sun.nio.ch.SocketChannelImplWithBlockingDisabled(this);
     }
 
     @Override
     public SocketChannel openSocketChannel(ProtocolFamily family) throws IOException {
-        return new sun.nio.ch.SocketChannelImpl(this, family);
+        return new sun.nio.ch.SocketChannelImplWithBlockingDisabled(this, family);
     }
 
     @Override
