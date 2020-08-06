@@ -59,7 +59,6 @@ class ServerSocketChannelImplWithBlockingDisabled extends ServerSocketChannelImp
         }
     }
 
-
     @Override
     @SuppressWarnings("unchecked")
     public <T> T getOption(SocketOption<T> name)
@@ -125,7 +124,10 @@ class ServerSocketChannelImplWithBlockingDisabled extends ServerSocketChannelImp
             if (sm != null) {
                 sm.checkAccept(isa.getAddress().getHostAddress(), isa.getPort());
             }
-            return new SocketChannelImplWithBlockingDisabled(provider(), (ProtocolFamily)familyHandle.get(this), newfd, isa);
+            SocketChannelImplWithBlockingDisabled newChannel = new SocketChannelImplWithBlockingDisabled(provider(),
+                    (ProtocolFamily)familyHandle.get(this), newfd, isa);
+            newChannel.useHighPerformance = this.useHighPerformance;
+            return newChannel;
         } catch (Exception e) {
             nd.close(newfd);
             throw e;
