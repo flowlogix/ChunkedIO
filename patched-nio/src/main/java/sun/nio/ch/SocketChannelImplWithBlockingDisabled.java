@@ -17,6 +17,7 @@ import java.lang.invoke.MethodHandles;
 import java.lang.invoke.VarHandle;
 import java.net.SocketException;
 import java.net.SocketOption;
+import java.nio.channels.AsynchronousCloseException;
 import java.nio.channels.SocketChannel;
 import sun.net.*;
 
@@ -29,6 +30,8 @@ class SocketChannelImplWithBlockingDisabled extends SocketChannelImpl {
     private static final VarHandle connectionResetHandle;
     private static final NativeDispatcher nd = new SocketDispatcher();
     private static final VarHandle fdHandle;
+    private static final VarHandle stateHandle;
+    private static final int ST_CLOSED;
 
     SocketChannelImplWithBlockingDisabled(SelectorProvider sp) throws IOException {
         super(sp);
@@ -52,6 +55,10 @@ class SocketChannelImplWithBlockingDisabled extends SocketChannelImpl {
                     .findVarHandle(SocketChannelImpl.class, "connectionReset", boolean.class);
             fdHandle = MethodHandles.privateLookupIn(SocketChannelImpl.class, MethodHandles.lookup())
                     .findVarHandle(SocketChannelImpl.class, "fd", FileDescriptor.class);
+            stateHandle = MethodHandles.privateLookupIn(SocketChannelImpl.class, MethodHandles.lookup())
+                   .findVarHandle(SocketChannelImpl.class, "state", int.class);
+            ST_CLOSED = (int)MethodHandles.privateLookupIn(SocketChannelImpl.class, MethodHandles.lookup())
+                   .findStaticVarHandle(SocketChannelImpl.class, "ST_CLOSED", int.class).get();
         } catch (ReflectiveOperationException ex) {
             throw new RuntimeException(ex);
         }
@@ -59,6 +66,10 @@ class SocketChannelImplWithBlockingDisabled extends SocketChannelImpl {
 
     @Override
     public int read(ByteBuffer buf) throws IOException {
+        if (!useHighPerformance) {
+            return super.read(buf);
+        }
+
         Objects.requireNonNull(buf);
         int n = 0;
         try {
@@ -82,6 +93,10 @@ class SocketChannelImplWithBlockingDisabled extends SocketChannelImpl {
     public long read(ByteBuffer[] dsts, int offset, int length)
         throws IOException
     {
+        if (!useHighPerformance) {
+            return super.read(dsts, offset, length);
+        }
+
         Objects.checkFromIndexSize(offset, length, dsts.length);
         long n = 0;
         try {
@@ -99,6 +114,49 @@ class SocketChannelImplWithBlockingDisabled extends SocketChannelImpl {
             }
         }
         return IOStatus.normalize(n);
+    }
+
+    @Override
+    public int write(ByteBuffer buf) throws IOException {
+        if (!useHighPerformance) {
+            return super.write(buf);
+        }
+
+        Objects.requireNonNull(buf);
+        int n = 0;
+        n = IOUtil.write((FileDescriptor)fdHandle.get(this), buf, -1, nd);
+        if (n <= 0) {
+            throw new AsynchronousCloseException();
+        }
+        return IOStatus.normalize(n);
+    }
+
+    @Override
+    public long write(ByteBuffer[] srcs, int offset, int length)
+        throws IOException
+    {
+        if (!useHighPerformance) {
+            return super.write(srcs, offset, length);
+        }
+
+        Objects.checkFromIndexSize(offset, length, srcs.length);
+        long n = 0;
+        n = IOUtil.write((FileDescriptor)fdHandle.get(this), srcs, offset, length, nd);
+        if (n <= 0) {
+            throw new AsynchronousCloseException();
+        }
+        return IOStatus.normalize(n);
+    }
+
+    @Override
+    protected void implCloseSelectableChannel() throws IOException {
+        if (useHighPerformance) {
+            stateHandle.set(this, ST_CLOSED);
+            nd.close((FileDescriptor)fdHandle.get(this));
+        }
+        else {
+            super.implCloseSelectableChannel();
+        }
     }
 
     @Override
