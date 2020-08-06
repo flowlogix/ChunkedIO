@@ -89,16 +89,12 @@ public class Transport {
         }
     }
 
-    void setHighPerformance(NetworkChannel socket) {
-        if (selectLoop instanceof BlockingSelectLoop) {
-            try {
-                if (!socket.getOption(useHighPerformanceSockets)) {
-                    throw new IllegalStateException("High Performance Chunked I/O mode cannot run without patched NIO module");
-                } else {
-                    socket.setOption(useHighPerformanceSockets, true);
-                }
-            } catch (IOException ex) {
-                throw new RuntimeException(ex);
+    void setHighPerformance(NetworkChannel socket) throws IOException {
+        if (selectLoop.isBlocking()) {
+            if (!socket.getOption(useHighPerformanceSockets)) {
+                throw new IllegalStateException("High Performance Chunked I/O mode cannot run without patched NIO module");
+            } else {
+                socket.setOption(useHighPerformanceSockets, true);
             }
         }
     }

@@ -118,4 +118,9 @@ public class NonBlockingSelectLoop implements SelectLoop {
         channel.channel.keyFor(selector).interestOps(SelectionKey.OP_READ);
         return false;
     }
+
+    @Override
+    public boolean isBlocking() {
+        return false;
+    }
 }

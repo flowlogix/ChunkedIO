@@ -88,4 +88,9 @@ public class BlockingSelectLoop implements SelectLoop {
             return resubmit;
         });
     }
+
+    @Override
+    public boolean isBlocking() {
+        return true;
+    }
 }
