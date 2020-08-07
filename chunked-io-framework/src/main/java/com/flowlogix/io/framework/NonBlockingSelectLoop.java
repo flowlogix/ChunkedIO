@@ -12,6 +12,7 @@ import java.nio.channels.Selector;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
 import java.nio.channels.spi.SelectorProvider;
+import java.util.concurrent.LinkedBlockingQueue;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -23,8 +24,18 @@ public class NonBlockingSelectLoop implements SelectLoop {
     private final Selector selector;
     private volatile boolean started;
     private final Thread selectLoopThread = new Thread(logExceptions(this::run), "SelectLoop");
+    private final LinkedBlockingQueue<NewOps> registerQueue = new LinkedBlockingQueue<>();
     private static final Logger log = Logger.getLogger(NonBlockingSelectLoop.class.getName());
 
+    class NewOps {
+        Channel channel;
+        boolean isWrite;
+
+        public NewOps(Channel channel, boolean iswrite) {
+            this.channel = channel;
+            this.isWrite = iswrite;
+        }
+    }
 
     public NonBlockingSelectLoop() {
         try {
@@ -48,16 +59,30 @@ public class NonBlockingSelectLoop implements SelectLoop {
                         if (key.channel() instanceof SocketChannel) {
                             Channel channel = (Channel) key.attachment();
                             if (key.isValid() && key.isReadable()) {
-                                channel.read();
+                                if (!channel.read() && channel.channel.isOpen()) {
+                                    channel.channel.keyFor(selector).interestOpsAnd(SelectionKey.OP_WRITE);
+                                }
                             }
                             if (key.isValid() && key.isWritable()) {
-                                channel.write();
+                                if (!channel.write() && channel.channel.isOpen()) {
+                                    channel.channel.keyFor(selector).interestOpsAnd(SelectionKey.OP_READ);
+                                }
                             }
                         }
                     } catch (Exception ex) {
                         log.log(Level.WARNING, "SelectLoop Exception", ex);
                     }
                 });
+                NewOps newOps;
+                while ((newOps = registerQueue.poll()) != null) {
+                    SelectionKey selectionKey = newOps.channel.channel.keyFor(selector);
+                    int ops = newOps.isWrite? SelectionKey.OP_WRITE : SelectionKey.OP_READ;
+                    if (selectionKey != null && selectionKey.isValid()) {
+                        selectionKey.interestOpsOr(ops);
+                    } else if (selectionKey == null) {
+                        newOps.channel.channel.register(selector, ops, newOps.channel);
+                    }
+                }
             }
         } catch (IOException ex) {
             throw new RuntimeException(ex);
@@ -96,8 +121,10 @@ public class NonBlockingSelectLoop implements SelectLoop {
     public void registerRead(Channel channel) {
         try {
             channel.channel.configureBlocking(false);
-            channel.channel.register(selector, SelectionKey.OP_READ, channel);
-            selector.wakeup();
+            if (channel.requestedReadCount.incrementAndGet() == 1) {
+                registerQueue.add(new NewOps(channel, false));
+                selector.wakeup();
+            }
         } catch (IOException ex) {
             throw new RuntimeException(ex);
         }
@@ -105,26 +132,20 @@ public class NonBlockingSelectLoop implements SelectLoop {
 
     @Override
     public boolean unregisterRead(Channel channel) {
-        channel.channel.keyFor(selector).interestOps(SelectionKey.OP_READ).cancel();
-        selector.wakeup();
-        return false;
+        return channel.requestedReadCount.decrementAndGet() != 0;
     }
 
     @Override
     public void registerWrite(Channel channel) {
-        try {
-            channel.channel.register(selector, SelectionKey.OP_WRITE, channel);
+        if (channel.requestedWriteCount.incrementAndGet() == 1) {
+            registerQueue.add(new NewOps(channel, true));
             selector.wakeup();
-        } catch (IOException ex) {
-            throw new RuntimeException(ex);
         }
     }
 
     @Override
     public boolean unregisterWrite(Channel channel) {
-        channel.channel.keyFor(selector).interestOps(SelectionKey.OP_WRITE).cancel();
-        selector.wakeup();
-        return false;
+        return channel.requestedWriteCount.decrementAndGet() != 0;
     }
 
     @Override
