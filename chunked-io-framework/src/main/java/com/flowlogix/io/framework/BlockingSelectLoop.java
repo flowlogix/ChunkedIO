@@ -23,9 +23,6 @@ public class BlockingSelectLoop implements SelectLoop {
         this.transport = transport;
     }
 
-    private void run(Callable<Boolean> callable) {
-    }
-
     @Override
     public void start() {
         started = true;
@@ -50,7 +47,7 @@ public class BlockingSelectLoop implements SelectLoop {
         if (!started) {
             queue.offer(callable);
         } else {
-            run(callable);
+            transport.ioExec.submit(callable);
         }
     }
 
