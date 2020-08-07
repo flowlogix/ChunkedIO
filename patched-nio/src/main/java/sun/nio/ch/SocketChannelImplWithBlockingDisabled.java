@@ -5,7 +5,6 @@
  */
 package sun.nio.ch;
 
-import com.flowlogix.nio.ch.GetSetOptions;
 import java.io.IOException;
 import java.net.ProtocolFamily;
 import java.nio.channels.spi.SelectorProvider;
@@ -17,9 +16,12 @@ import java.lang.invoke.MethodHandles;
 import java.lang.invoke.VarHandle;
 import java.net.SocketException;
 import java.net.SocketOption;
+import java.net.SocketTimeoutException;
 import java.nio.channels.AsynchronousCloseException;
 import java.nio.channels.SocketChannel;
-import sun.net.*;
+import sun.net.ConnectionResetException;
+import static sun.nio.ch.SocketProviderWithBlockingDisabled.HighPerformanceOptionName;
+import static sun.nio.ch.SocketProviderWithBlockingDisabled.SignalSocketOptionName;
 
 /**
  *
@@ -82,7 +84,9 @@ class SocketChannelImplWithBlockingDisabled extends SocketChannelImpl {
             connectionResetHandle.set(this, true);
             throwConnectionReset();
         } finally {
-            if (n <= 0) {
+            if (IOStatus.okayToRetry(n) && isOpen()) {
+                throw new SocketTimeoutException();
+            } else if (n <= 0) {
                 return IOStatus.EOF;
             }
         }
@@ -109,7 +113,9 @@ class SocketChannelImplWithBlockingDisabled extends SocketChannelImpl {
             connectionResetHandle.set(this, true);
             throwConnectionReset();
         } finally {
-            if (n <= 0) {
+            if (IOStatus.okayToRetry(n) && isOpen()) {
+                throw new SocketTimeoutException();
+            } else if (n <= 0) {
                 return IOStatus.EOF;
             }
         }
@@ -124,8 +130,16 @@ class SocketChannelImplWithBlockingDisabled extends SocketChannelImpl {
 
         Objects.requireNonNull(buf);
         int n = 0;
-        n = IOUtil.write((FileDescriptor)fdHandle.get(this), buf, -1, nd);
-        if (n <= 0) {
+        try {
+            n = IOUtil.write((FileDescriptor)fdHandle.get(this), buf, -1, nd);
+        } catch (IOException ex) {
+            if (isOpen()) {
+                throw ex;
+            }
+        }
+        if (IOStatus.okayToRetry(n) && isOpen()) {
+            throw new SocketTimeoutException();
+        } else if (n <= 0) {
             throw new AsynchronousCloseException();
         }
         return IOStatus.normalize(n);
@@ -141,8 +155,16 @@ class SocketChannelImplWithBlockingDisabled extends SocketChannelImpl {
 
         Objects.checkFromIndexSize(offset, length, srcs.length);
         long n = 0;
-        n = IOUtil.write((FileDescriptor)fdHandle.get(this), srcs, offset, length, nd);
-        if (n <= 0) {
+        try {
+            n = IOUtil.write((FileDescriptor)fdHandle.get(this), srcs, offset, length, nd);
+        } catch (IOException ex) {
+            if (isOpen()) {
+                throw ex;
+            }
+        }
+        if (IOStatus.okayToRetry(n) && isOpen()) {
+            throw new SocketTimeoutException();
+        } else if (n <= 0) {
             throw new AsynchronousCloseException();
         }
         return IOStatus.normalize(n);
@@ -164,13 +186,29 @@ class SocketChannelImplWithBlockingDisabled extends SocketChannelImpl {
     public <T> T getOption(SocketOption<T> name)
         throws IOException
     {
-        return GetSetOptions.getOption(name, () -> useHighPerformance, super::getOption);
+        switch(name.name()) {
+            case HighPerformanceOptionName:
+                return (T)Boolean.valueOf(useHighPerformance);
+            case SignalSocketOptionName:
+                return (T)Long.valueOf(NativeThread.current());
+            default:
+                return super.getOption(name);
+        }
     }
 
     @Override
     public <T> SocketChannel setOption(SocketOption<T> name, T value)
         throws IOException {
-        GetSetOptions.setOption(name, value, (tf) -> useHighPerformance = tf, super::setOption);
+        switch(name.name()) {
+            case HighPerformanceOptionName:
+                useHighPerformance = (Boolean)value;
+                break;
+            case SignalSocketOptionName:
+                NativeThread.signal((Long)value);
+                break;
+            default:
+                super.setOption(name, value);
+        }
         return this;
     }
 

@@ -5,7 +5,6 @@
  */
 package sun.nio.ch;
 
-import com.flowlogix.nio.ch.GetSetOptions;
 import java.io.IOException;
 import java.nio.channels.SocketChannel;
 import java.nio.channels.ServerSocketChannel;
@@ -17,6 +16,9 @@ import java.net.SocketOption;
 import java.net.InetSocketAddress;
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.VarHandle;
+import java.net.SocketTimeoutException;
+import static sun.nio.ch.SocketProviderWithBlockingDisabled.HighPerformanceOptionName;
+import static sun.nio.ch.SocketProviderWithBlockingDisabled.SignalSocketOptionName;
 
 /**
  *
@@ -64,13 +66,29 @@ class ServerSocketChannelImplWithBlockingDisabled extends ServerSocketChannelImp
     public <T> T getOption(SocketOption<T> name)
         throws IOException
     {
-        return GetSetOptions.getOption(name, () -> useHighPerformance, super::getOption);
+        switch(name.name()) {
+            case HighPerformanceOptionName:
+                return (T)Boolean.valueOf(useHighPerformance);
+            case SignalSocketOptionName:
+                return (T)Long.valueOf(NativeThread.current());
+            default:
+                return super.getOption(name);
+        }
     }
 
     @Override
     public <T> ServerSocketChannel setOption(SocketOption<T> name, T value)
         throws IOException {
-        GetSetOptions.setOption(name, value, (tf) -> useHighPerformance = tf, super::setOption);
+        switch(name.name()) {
+            case HighPerformanceOptionName:
+                useHighPerformance = (Boolean)value;
+                break;
+            case SignalSocketOptionName:
+                NativeThread.signal((Long)value);
+                break;
+            default:
+                super.setOption(name, value);
+        }
         return this;
     }
 
@@ -110,6 +128,8 @@ class ServerSocketChannelImplWithBlockingDisabled extends ServerSocketChannelImp
         }
         if (n > 0) {
             return finishAccept(newfd, isaa[0]);
+        } else if (IOStatus.okayToRetry(n) && isOpen()) {
+            throw new SocketTimeoutException();
         } else {
             return null;
         }

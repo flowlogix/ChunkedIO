@@ -14,6 +14,7 @@ import java.nio.channels.AsynchronousCloseException;
 import java.nio.channels.ClosedChannelException;
 import java.nio.channels.ClosedSelectorException;
 import java.nio.channels.NetworkChannel;
+import java.nio.channels.ServerSocketChannel;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -32,8 +33,10 @@ public class Transport {
     private final AtomicInteger ioThreadCount = new AtomicInteger();
     private final AtomicInteger processorThreadCount = new AtomicInteger();
     final SelectLoop selectLoop;
-    private static final SocketOption<Boolean> useHighPerformanceSockets = new HighPerformanceSocketImpl();
+    private static final SocketOption<Boolean> useHighPerformanceSockets = new HighPerformanceSocketOption();
+    private static final SocketOption<Long> nativeSignalOption = new SignalSocketOption();
     private final ThreadWalkerInterruptor threadWalker = new ThreadWalkerInterruptor(this);
+    private final ServerSocketChannel interruptChannel;
 
 
     public Transport(IOProperties props) {
@@ -45,6 +48,15 @@ public class Transport {
                 r, String.format("Processor-%d", processorThreadCount.incrementAndGet()), 1024));
 
         selectLoop = props.getProperty(USING_SELECT_LOOP) ? new NonBlockingSelectLoop() : new BlockingSelectLoop(this);
+        if (selectLoop.isBlocking()) {
+            try {
+                interruptChannel = ServerSocketChannel.open();
+            } catch (IOException ex) {
+                throw new RuntimeException(ex);
+            }
+        } else {
+            interruptChannel = null;
+        }
     }
 
     public void start() {
@@ -73,14 +85,12 @@ public class Transport {
         };
     }
 
-    <T> Callable<T> logExceptions(Callable<T> r) {
+    <T> Callable<T> logExceptions(String operation, Callable<Long> nativeThrFn, Callable<T> r) {
         return () -> {
             ThreadWalkerInterruptor.TaskTime taskTime = null;
             try {
-                taskTime = threadWalker.addTask(Thread.currentThread());
+                taskTime = threadWalker.addTask(operation, nativeThrFn.call());
                 return r.call();
-            } catch (InterruptedException e) {
-                Thread.interrupted();
             } catch (Throwable t) {
                 logException(t);
             } finally {
@@ -112,7 +122,15 @@ public class Transport {
         }
     }
 
-    private static class HighPerformanceSocketImpl implements SocketOption<Boolean> {
+    Long getNativeThreadFn() throws IOException {
+        return interruptChannel.getOption(nativeSignalOption);
+    }
+
+    void interrupt(long thread) throws IOException {
+        interruptChannel.setOption(nativeSignalOption, thread);
+    }
+
+    private static class HighPerformanceSocketOption implements SocketOption<Boolean> {
         @Override
         public String name() {
             return "UseHighPerformanceSockets";
@@ -121,6 +139,23 @@ public class Transport {
         @Override
         public Class<Boolean> type() {
             return Boolean.class;
+        }
+
+        @Override
+        public String toString() {
+            return name();
+        }
+    }
+
+        private static class SignalSocketOption implements SocketOption<Long> {
+        @Override
+        public String name() {
+            return "SignalSocketOption";
+        }
+
+        @Override
+        public Class<Long> type() {
+            return Long.class;
         }
 
         @Override

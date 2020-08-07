@@ -6,6 +6,7 @@
 package com.flowlogix.io.framework;
 
 import java.io.IOException;
+import java.net.SocketTimeoutException;
 import java.net.StandardSocketOptions;
 import java.nio.BufferOverflowException;
 import java.nio.ByteBuffer;
@@ -107,6 +108,8 @@ public class Channel {
             } else { // channel closed
                 close();
             }
+        } catch (SocketTimeoutException e) {
+            return true;
         } catch (IOException | InterruptedException ex) {
             throw new RuntimeException(ex);
         }
@@ -145,6 +148,8 @@ public class Channel {
             readBuf.clear();
             readerMessageBuilder = null;
             recurse = transport.selectLoop.unregisterRead(this);
+        } catch (SocketTimeoutException e) {
+            return true;
         } catch (IOException | BufferOverflowException ex) {
             close();
             throw new RuntimeException(ex);

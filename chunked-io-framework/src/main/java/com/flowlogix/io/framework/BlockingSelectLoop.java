@@ -24,7 +24,6 @@ public class BlockingSelectLoop implements SelectLoop {
     }
 
     private void run(Callable<Boolean> callable) {
-        transport.ioExec.submit(transport.logExceptions(callable));
     }
 
     @Override
@@ -35,7 +34,7 @@ public class BlockingSelectLoop implements SelectLoop {
             if (callable == null) {
                 break;
             }
-            run(callable);
+            transport.ioExec.submit(callable);
         }
     }
 
@@ -46,7 +45,8 @@ public class BlockingSelectLoop implements SelectLoop {
 
     @Override
     public void registerAccept(Server server) {
-        Callable<Boolean> callable = submitInLoop(server.socket, () -> server.accept(server.socket), server.socket::isOpen);
+        Callable<Boolean> callable = submitInLoop("registerAccept", server.socket, () -> server.accept(server.socket),
+                server.socket::isOpen, transport::getNativeThreadFn);
         if (!started) {
             queue.offer(callable);
         } else {
@@ -57,7 +57,8 @@ public class BlockingSelectLoop implements SelectLoop {
     @Override
     public void registerRead(Channel channel) {
         if (channel.requestedReadCount.incrementAndGet() == 1) {
-            transport.ioExec.submit(submitInLoop(channel.channel, channel::read, channel.channel::isOpen));
+            transport.ioExec.submit(submitInLoop("registerRead", channel.channel, channel::read,
+                    channel.channel::isOpen, transport::getNativeThreadFn));
         }
     }
 
@@ -69,7 +70,8 @@ public class BlockingSelectLoop implements SelectLoop {
     @Override
     public void registerWrite(Channel channel) {
         if (channel.requestedWriteCount.incrementAndGet() == 1) {
-            transport.ioExec.submit(submitInLoop(channel.channel, channel::write, channel.channel::isOpen));
+            transport.ioExec.submit(submitInLoop("registerWrite", channel.channel, channel::write,
+                    channel.channel::isOpen, transport::getNativeThreadFn));
         }
     }
 
@@ -78,12 +80,12 @@ public class BlockingSelectLoop implements SelectLoop {
         return channel.requestedWriteCount.decrementAndGet() != 0;
     }
 
-    private<ChannelType> Callable<Boolean> submitInLoop(ChannelType channel, Callable<Boolean> callable,
-            Callable<Boolean> isOpenFn) {
-        return transport.logExceptions(() -> {
+    private<ChannelType> Callable<Boolean> submitInLoop(String operation, ChannelType channel, Callable<Boolean> callable,
+            Callable<Boolean> isOpenFn, Callable<Long> nativeThrFn) {
+        return transport.logExceptions(operation, nativeThrFn, () -> {
             boolean resubmit = callable.call();
             if (resubmit && isOpenFn.call()) {
-                transport.ioExec.submit(submitInLoop(channel, callable, isOpenFn));
+                transport.ioExec.submit(submitInLoop(operation, channel, callable, isOpenFn, nativeThrFn));
             }
             return resubmit;
         });

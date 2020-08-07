@@ -5,7 +5,9 @@
  */
 package com.flowlogix.io.framework;
 
-import java.util.LinkedList;
+import java.io.IOException;
+import java.util.ConcurrentModificationException;
+import java.util.concurrent.ConcurrentLinkedQueue;
 
 /**
  *
@@ -13,7 +15,7 @@ import java.util.LinkedList;
  */
 public class ThreadWalkerInterruptor {
     private final Transport transport;
-    private final LinkedList<TaskTime> threadList;
+    private final ConcurrentLinkedQueue<TaskTime> threadList;
     private Thread interruptorThread = new Thread(Transport.logExceptions(this::walkAndInterrupt), "ThreadWalkerInterruptor");
     private volatile boolean started;
 
@@ -31,27 +33,34 @@ public class ThreadWalkerInterruptor {
     }
 
     static class TaskTime {
-        Thread thread;
+        final String operation;
+        long thread;
         long timeStarted;
 
-        public TaskTime(Thread thread, long timeStarted) {
+        public TaskTime(String operation, long thread, long timeStarted) {
+            this.operation = operation;
             this.thread = thread;
             this.timeStarted = timeStarted;
         }
 
         void taskFinished() {
-            thread = null;
+            thread = -1;
+        }
+
+        @Override
+        public String toString() {
+            return String.format("Operation: %s, Thread: %d, Time: %d", operation, thread, timeStarted);
         }
     };
 
     ThreadWalkerInterruptor(Transport transport) {
         this.transport = transport;
-        threadList = new LinkedList<>();
+        threadList = new ConcurrentLinkedQueue<>();
     }
 
-    TaskTime addTask(Thread thr) {
-        TaskTime taskTime = new TaskTime(thr, System.currentTimeMillis());
-        threadList.add(taskTime);
+    TaskTime addTask(String operation, long thr) {
+        TaskTime taskTime = new TaskTime(operation, thr, System.currentTimeMillis());
+        threadList.offer(taskTime);
         return taskTime;
     }
 
@@ -63,18 +72,20 @@ public class ThreadWalkerInterruptor {
                 long pastTimeOut = System.currentTimeMillis() - timeout;
                 while (iterator.hasNext()) {
                     TaskTime taskTime = iterator.next();
-                    if (taskTime.thread == null) {
+                    if (taskTime.thread == -1) {
                         // task finished
                         iterator.remove();
                     } else if (taskTime.timeStarted < pastTimeOut) {
-                        taskTime.thread.interrupt();
+                        transport.interrupt(taskTime.thread);
                     }
                 }
                 Thread.sleep(timeout);
-            } catch (InterruptedException ex) {
+            } catch (InterruptedException | IOException ex) {
                 if (started) {
                     throw new RuntimeException(ex);
                 }
+            } catch (ConcurrentModificationException ex) {
+                // ignore
             }
         }
     }
