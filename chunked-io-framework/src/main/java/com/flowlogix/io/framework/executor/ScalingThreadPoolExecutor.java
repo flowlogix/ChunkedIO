@@ -65,7 +65,6 @@ public final class ScalingThreadPoolExecutor extends ThreadPoolExecutor {
 
         @Override
         public boolean add(E o) {
-
             if (this.delegate.add(o)) {
                 return true;
             } else {// Not possible in our case

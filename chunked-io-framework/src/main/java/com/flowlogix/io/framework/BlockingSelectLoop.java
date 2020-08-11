@@ -42,7 +42,7 @@ public class BlockingSelectLoop implements SelectLoop {
 
     @Override
     public void registerAccept(Server server) {
-        Callable<Boolean> callable = submitInLoop("accept", server.socket, () -> server.accept(server.socket),
+        Callable<Boolean> callable = submitInLoop("accept", () -> server.accept(server.socket),
                 server.socket::isOpen, transport::getNativeThreadFn);
         if (!started) {
             queue.offer(callable);
@@ -54,7 +54,7 @@ public class BlockingSelectLoop implements SelectLoop {
     @Override
     public void registerRead(Channel channel) {
         if (channel.requestedReadCount.incrementAndGet() == 1) {
-            transport.ioExec.submit(submitInLoop("read", channel.channel, channel::read,
+            transport.ioExec.submit(submitInLoop("read", channel::read,
                     channel.channel::isOpen, transport::getNativeThreadFn));
         }
     }
@@ -67,7 +67,7 @@ public class BlockingSelectLoop implements SelectLoop {
     @Override
     public void registerWrite(Channel channel) {
         if (channel.requestedWriteCount.incrementAndGet() == 1) {
-            transport.ioExec.submit(submitInLoop("write", channel.channel, channel::write,
+            transport.ioExec.submit(submitInLoop("write", channel::write,
                     channel.channel::isOpen, transport::getNativeThreadFn));
         }
     }
@@ -77,12 +77,12 @@ public class BlockingSelectLoop implements SelectLoop {
         return channel.requestedWriteCount.decrementAndGet() != 0;
     }
 
-    private<ChannelType> Callable<Boolean> submitInLoop(String operation, ChannelType channel, Callable<Boolean> callable,
+    private<ChannelType> Callable<Boolean> submitInLoop(String operation, Callable<Boolean> callable,
             Callable<Boolean> isOpenFn, Callable<Long> nativeThrFn) {
         return transport.logExceptions(operation, nativeThrFn, () -> {
             boolean resubmit = callable.call();
             if (resubmit && isOpenFn.call()) {
-                transport.ioExec.submit(submitInLoop(operation, channel, callable, isOpenFn, nativeThrFn));
+                transport.ioExec.submit(submitInLoop(operation, callable, isOpenFn, nativeThrFn));
             }
             return resubmit;
         });
