@@ -172,7 +172,7 @@ public class Transport {
         }
     }
 
-    private ExecutorService newCachedThreadPool(ThreadFactory threadFactory, int maxThreads) {
+    ExecutorService newCachedThreadPool(ThreadFactory threadFactory, int maxThreads) {
         return new ScalingThreadPoolExecutor(0, maxThreads,
                 60L, TimeUnit.SECONDS,
                 threadFactory);
