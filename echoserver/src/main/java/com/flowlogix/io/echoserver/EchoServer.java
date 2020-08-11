@@ -23,7 +23,7 @@ public class EchoServer {
         props.setProperty(IOProperties.Props.ACCEPT_BACKLOG, 4096);
         props.setProperty(IOProperties.Props.SOCKET_TIMEOUT_IN_MILLIS, 100L);
         props.setProperty(IOProperties.Props.IO_THREAD_STACK_SIZE, 1024);
-        props.setProperty(IOProperties.Props.MAX_IO_THREADS, 5);
+        props.setProperty(IOProperties.Props.MAX_IO_THREADS, 200);
         props.setProperty(IOProperties.Props.MAX_EXEC_THREADS, 5);
         props.setProperty(IOProperties.Props.EVENTS_UNDER_LOAD_TIMEOUT_NANOS, 5L * 1000000);
         props.setProperty(IOProperties.Props.EVENTS_IDLE_TIMEOUT_IN_MILLIS, 50L);

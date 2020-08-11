@@ -97,7 +97,7 @@ public class ThreadWalkerInterruptor {
                     }
                 }
             }
-            LockSupport.parkNanos(timeout * 10000000);
+            LockSupport.parkNanos(idleTimeout * 100 * 1000000);
         }
     }
 
@@ -115,7 +115,7 @@ public class ThreadWalkerInterruptor {
                         transport.interrupt(taskTime.thread);
                     }
                 }
-                LockSupport.parkNanos(isUnderLoad.get() ? underLoadTimeoutNanos : idleTimeout * 10000000);
+                LockSupport.parkNanos(isUnderLoad.get() ? underLoadTimeoutNanos : idleTimeout * 1000000);
             }
         } catch (IOException ex) {
             if (started) {

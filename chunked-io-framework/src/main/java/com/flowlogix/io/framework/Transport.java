@@ -5,6 +5,7 @@
  */
 package com.flowlogix.io.framework;
 
+import static com.flowlogix.io.framework.IOProperties.Props.EVENTS_IDLE_TIMEOUT_IN_MILLIS;
 import static com.flowlogix.io.framework.IOProperties.Props.IO_THREAD_STACK_SIZE;
 import static com.flowlogix.io.framework.IOProperties.Props.MAX_EXEC_THREADS;
 import static com.flowlogix.io.framework.IOProperties.Props.MAX_IO_THREADS;
@@ -159,8 +160,10 @@ public final class Transport {
     }
 
     ThreadPoolExecutor newCachedThreadPool(ThreadFactory threadFactory, int maxThreads) {
+        long timeout = props.getProperty(EVENTS_IDLE_TIMEOUT_IN_MILLIS);
+        timeout *= 100;
         return new ScalingThreadPoolExecutor(0, maxThreads,
-                60L, TimeUnit.SECONDS,
+                timeout, TimeUnit.MILLISECONDS,
                 threadFactory, threadWalker);
     }
 }
