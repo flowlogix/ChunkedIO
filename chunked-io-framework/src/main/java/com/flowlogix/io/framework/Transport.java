@@ -5,7 +5,11 @@
  */
 package com.flowlogix.io.framework;
 
+import static com.flowlogix.io.framework.IOProperties.Props.IO_THREAD_STACK_SIZE;
+import static com.flowlogix.io.framework.IOProperties.Props.MAX_EXEC_THREADS;
+import static com.flowlogix.io.framework.IOProperties.Props.MAX_IO_THREADS;
 import static com.flowlogix.io.framework.IOProperties.Props.USING_SELECT_LOOP;
+import com.flowlogix.io.framework.executor.ScalingThreadPoolExecutor;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.StringWriter;
@@ -17,7 +21,8 @@ import java.nio.channels.NetworkChannel;
 import java.nio.channels.ServerSocketChannel;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
+import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Logger;
 
@@ -41,11 +46,14 @@ public class Transport {
 
     public Transport(IOProperties props) {
         this.props = props;
+        int ioStackSize = props.getProperty(IO_THREAD_STACK_SIZE);
 
-        ioExec = Executors.newCachedThreadPool(r -> new Thread(Thread.currentThread().getThreadGroup(), r,
-                        String.format("I/O-Thread-%d", ioThreadCount.incrementAndGet()), 1024));
-        processorExec = Executors.newCachedThreadPool(r -> new Thread(Thread.currentThread().getThreadGroup(),
-                r, String.format("Processor-%d", processorThreadCount.incrementAndGet()), 1024));
+        ioExec = newCachedThreadPool(r -> new Thread(Thread.currentThread().getThreadGroup(), r,
+                        String.format("I/O-Thread-%d", ioThreadCount.incrementAndGet()), ioStackSize),
+                props.getProperty(MAX_IO_THREADS));
+        processorExec = newCachedThreadPool(r -> new Thread(Thread.currentThread().getThreadGroup(),
+                r, String.format("Processor-%d", processorThreadCount.incrementAndGet()), ioStackSize),
+                props.getProperty(MAX_EXEC_THREADS));
 
         selectLoop = props.getProperty(USING_SELECT_LOOP) ? new NonBlockingSelectLoop() : new BlockingSelectLoop(this);
         if (selectLoop.isBlocking()) {
@@ -147,7 +155,7 @@ public class Transport {
         }
     }
 
-        private static class SignalSocketOption implements SocketOption<Long> {
+    private static class SignalSocketOption implements SocketOption<Long> {
         @Override
         public String name() {
             return "SignalSocketOption";
@@ -162,5 +170,11 @@ public class Transport {
         public String toString() {
             return name();
         }
+    }
+
+    private ExecutorService newCachedThreadPool(ThreadFactory threadFactory, int maxThreads) {
+        return new ScalingThreadPoolExecutor(0, maxThreads,
+                60L, TimeUnit.SECONDS,
+                threadFactory);
     }
 }

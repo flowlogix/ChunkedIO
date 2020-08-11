@@ -22,6 +22,9 @@ public class EchoServer {
     EchoServer(int port) {
         props.setProperty(IOProperties.Props.ACCEPT_BACKLOG, 4096);
         props.setProperty(IOProperties.Props.SOCKET_TIMEOUT_IN_MILLIS, 100L);
+        props.setProperty(IOProperties.Props.IO_THREAD_STACK_SIZE, 1024);
+        props.setProperty(IOProperties.Props.MAX_IO_THREADS, 5);
+        props.setProperty(IOProperties.Props.MAX_EXEC_THREADS, 4);
         props.setProperty(IOProperties.Props.USING_SELECT_LOOP, false);
         System.out.println(props);
         this.transport = new Transport(props);

@@ -15,6 +15,9 @@ public class IOProperties {
     public enum Props {
         ACCEPT_BACKLOG,
         SOCKET_TIMEOUT_IN_MILLIS,
+        MAX_IO_THREADS,
+        MAX_EXEC_THREADS,
+        IO_THREAD_STACK_SIZE,
         USING_SELECT_LOOP,
     }
 
