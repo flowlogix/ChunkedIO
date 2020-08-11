@@ -5,6 +5,7 @@
  */
 package com.flowlogix.io.framework;
 
+import static com.flowlogix.io.framework.Transport.logException;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.logging.Logger;
@@ -79,13 +80,28 @@ public class BlockingSelectLoop implements SelectLoop {
 
     private<ChannelType> Callable<Boolean> submitInLoop(String operation, Callable<Boolean> callable,
             Callable<Boolean> isOpenFn, Callable<Long> nativeThrFn) {
-        return transport.logExceptions(operation, nativeThrFn, () -> {
+        return logExceptions(operation, nativeThrFn, () -> {
             boolean resubmit = callable.call();
             if (resubmit && isOpenFn.call()) {
                 transport.ioExec.submit(submitInLoop(operation, callable, isOpenFn, nativeThrFn));
             }
             return resubmit;
         });
+    }
+
+    private Callable<Boolean> logExceptions(String operation, Callable<Long> nativeThrFn, Callable<Boolean> r) {
+        return () -> {
+            ThreadWalkerInterruptor.TaskTime taskTime = null;
+            try {
+                taskTime = transport.threadWalker.addTask(operation, nativeThrFn.call());
+                return r.call();
+            } catch (Throwable t) {
+                logException(t);
+            } finally {
+                taskTime.taskFinished();
+            }
+            return null;
+        };
     }
 
     @Override

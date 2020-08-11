@@ -19,9 +19,9 @@ import java.nio.channels.ClosedChannelException;
 import java.nio.channels.ClosedSelectorException;
 import java.nio.channels.NetworkChannel;
 import java.nio.channels.ServerSocketChannel;
-import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Logger;
@@ -30,22 +30,23 @@ import java.util.logging.Logger;
  *
  * @author lprimak
  */
-public class Transport {
+public final class Transport {
     private static final Logger log = Logger.getLogger(Transport.class.getName());
     final IOProperties props;
-    final ExecutorService ioExec;
+    final ThreadPoolExecutor ioExec;
     final ExecutorService processorExec;
     private final AtomicInteger ioThreadCount = new AtomicInteger();
     private final AtomicInteger processorThreadCount = new AtomicInteger();
     final SelectLoop selectLoop;
     private static final SocketOption<Boolean> useHighPerformanceSockets = new HighPerformanceSocketOption();
     private static final SocketOption<Long> nativeSignalOption = new SignalSocketOption();
-    private final ThreadWalkerInterruptor threadWalker = new ThreadWalkerInterruptor(this);
+    final ThreadWalkerInterruptor threadWalker;
     private final ServerSocketChannel interruptChannel;
 
 
     public Transport(IOProperties props) {
         this.props = props;
+        this.threadWalker = new ThreadWalkerInterruptor(this);
         int ioStackSize = props.getProperty(IO_THREAD_STACK_SIZE);
 
         ioExec = newCachedThreadPool(r -> new Thread(Thread.currentThread().getThreadGroup(), r,
@@ -93,22 +94,7 @@ public class Transport {
         };
     }
 
-    <T> Callable<T> logExceptions(String operation, Callable<Long> nativeThrFn, Callable<T> r) {
-        return () -> {
-            ThreadWalkerInterruptor.TaskTime taskTime = null;
-            try {
-                taskTime = threadWalker.addTask(operation, nativeThrFn.call());
-                return r.call();
-            } catch (Throwable t) {
-                logException(t);
-            } finally {
-                taskTime.taskFinished();
-            }
-            return null;
-        };
-    }
-
-    static private void logException(Throwable t) {
+    static void logException(Throwable t) {
         StringWriter sw = new StringWriter();
         PrintWriter pw = new PrintWriter(sw);
         t.printStackTrace(pw);
@@ -172,9 +158,9 @@ public class Transport {
         }
     }
 
-    ExecutorService newCachedThreadPool(ThreadFactory threadFactory, int maxThreads) {
+    ThreadPoolExecutor newCachedThreadPool(ThreadFactory threadFactory, int maxThreads) {
         return new ScalingThreadPoolExecutor(0, maxThreads,
                 60L, TimeUnit.SECONDS,
-                threadFactory);
+                threadFactory, threadWalker);
     }
 }

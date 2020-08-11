@@ -5,6 +5,7 @@
  */
 package com.flowlogix.io.framework.executor;
 
+import com.flowlogix.io.framework.ThreadWalkerInterruptor;
 import java.util.Collection;
 import java.util.Iterator;
 import java.util.concurrent.LinkedTransferQueue;
@@ -20,15 +21,12 @@ import java.util.concurrent.TransferQueue;
  * https://dzone.com/articles/scalable-java-thread-pool-executor (Workaround #2)
  */
 public final class ScalingThreadPoolExecutor extends ThreadPoolExecutor {
+    private final ThreadWalkerInterruptor threadWalker;
 
-    public ScalingThreadPoolExecutor(int corePoolSize, int maximumPoolSize, long keepAliveTime, TimeUnit keepAliveUnit, ThreadFactory threadFactory) {
+    public ScalingThreadPoolExecutor(int corePoolSize, int maximumPoolSize, long keepAliveTime, TimeUnit keepAliveUnit, ThreadFactory threadFactory, ThreadWalkerInterruptor walker) {
         super(corePoolSize, maximumPoolSize, keepAliveTime, keepAliveUnit,
                 new DynamicBlockingQueue<Runnable>(new LinkedTransferQueue<Runnable>()), threadFactory, new ForceQueuePolicy());
-    }
-
-    public ScalingThreadPoolExecutor(int corePoolSize, int maximumPoolSize, long keepAliveTime, TimeUnit keepAliveUnit, TransferQueue<Runnable> workQueue, ThreadFactory threadFactory) {
-        super(corePoolSize, maximumPoolSize, keepAliveTime, keepAliveUnit,
-                new DynamicBlockingQueue<Runnable>(workQueue), threadFactory, new ForceQueuePolicy());
+        this.threadWalker = walker;
     }
 
     @Override
@@ -37,12 +35,13 @@ public final class ScalingThreadPoolExecutor extends ThreadPoolExecutor {
     }
 
     private static class ForceQueuePolicy implements RejectedExecutionHandler {
-
         @Override
         public void rejectedExecution(Runnable r, ThreadPoolExecutor executor) {
             try {
-                //Rejected work add to Queue.
+                // Rejected work add to Queue.
                 executor.getQueue().put(r);
+                ScalingThreadPoolExecutor exec = (ScalingThreadPoolExecutor)executor;
+                exec.threadWalker.setUnderLoad();
             } catch (InterruptedException e) {
                 //should never happen since we never wait
                 throw new RejectedExecutionException(e);
