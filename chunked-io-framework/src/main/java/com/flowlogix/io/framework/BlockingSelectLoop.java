@@ -43,8 +43,12 @@ public class BlockingSelectLoop implements SelectLoop {
 
     @Override
     public void registerAccept(Server server) {
-        Callable<Boolean> callable = submitInLoop("accept", () -> server.accept(server.socket),
-                server.socket::isOpen, transport::getNativeThreadFn);
+        registerAccept(server.socket, () -> server.accept(server.socket));
+    }
+
+    public void registerAccept(java.nio.channels.Channel channel, Callable<Boolean> acceptFn) {
+        Callable<Boolean> callable = submitInLoop("accept", acceptFn,
+                channel::isOpen, transport::getNativeThreadFn);
         if (!started) {
             queue.offer(callable);
         } else {

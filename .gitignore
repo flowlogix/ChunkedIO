@@ -1,4 +1,5 @@
 **/target
 **/nbactions.xml
 **/.DS_Store
-/chunked-io-framework/nbproject/
+**/nbproject/
+**/nb-configuration.xml 
