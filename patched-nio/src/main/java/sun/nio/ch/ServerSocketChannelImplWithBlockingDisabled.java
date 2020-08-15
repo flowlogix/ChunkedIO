@@ -18,7 +18,6 @@ import java.lang.invoke.MethodHandles;
 import java.lang.invoke.VarHandle;
 import java.net.SocketTimeoutException;
 import static sun.nio.ch.SocketProviderWithBlockingDisabled.HighPerformanceOptionName;
-import static sun.nio.ch.SocketProviderWithBlockingDisabled.SignalSocketOptionName;
 
 /**
  *
@@ -66,28 +65,22 @@ class ServerSocketChannelImplWithBlockingDisabled extends ServerSocketChannelImp
     public <T> T getOption(SocketOption<T> name)
         throws IOException
     {
-        switch(name.name()) {
-            case HighPerformanceOptionName:
-                return (T)Boolean.valueOf(useHighPerformance);
-            case SignalSocketOptionName:
-                return (T)Long.valueOf(NativeThread.current());
-            default:
-                return super.getOption(name);
+        if (useHighPerformance) {
+            return (T)Long.valueOf(NativeThread.current());
+        } else {
+            return super.getOption(name);
         }
     }
 
     @Override
     public <T> ServerSocketChannel setOption(SocketOption<T> name, T value)
         throws IOException {
-        switch(name.name()) {
-            case HighPerformanceOptionName:
-                useHighPerformance = (Boolean)value;
-                break;
-            case SignalSocketOptionName:
-                NativeThread.signal((Long)value);
-                break;
-            default:
-                super.setOption(name, value);
+        if (useHighPerformance) {
+            NativeThread.signal((Long)value);
+        } else if (name.name().equals(HighPerformanceOptionName)) {
+            useHighPerformance = (Boolean)value;
+        } else {
+            super.setOption(name, value);
         }
         return this;
     }

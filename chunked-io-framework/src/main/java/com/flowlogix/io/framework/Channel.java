@@ -7,7 +7,6 @@ package com.flowlogix.io.framework;
 
 import java.io.IOException;
 import java.net.SocketTimeoutException;
-import java.net.StandardSocketOptions;
 import java.nio.BufferOverflowException;
 import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
@@ -40,12 +39,8 @@ public class Channel {
     Channel(Transport transport, MessageHandler messageHandler, SocketChannel channel) {
         this.channel = channel;
         this.transport = transport;
-        try {
-            readBuf = ByteBuffer.allocateDirect(channel.getOption(StandardSocketOptions.SO_RCVBUF));
-            writeChunkSize = channel.getOption(StandardSocketOptions.SO_SNDBUF);
-        } catch (IOException ex) {
-            throw new RuntimeException(ex);
-        }
+        readBuf = ByteBuffer.allocateDirect(transport.recvbuf);
+        writeChunkSize = transport.sendbuf;
         this.handler = messageHandler;
         transport.selectLoop.registerRead(this);
     }

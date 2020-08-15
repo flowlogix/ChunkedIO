@@ -15,11 +15,13 @@ import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.net.SocketOption;
+import java.net.StandardSocketOptions;
 import java.nio.channels.AsynchronousCloseException;
 import java.nio.channels.ClosedChannelException;
 import java.nio.channels.ClosedSelectorException;
 import java.nio.channels.NetworkChannel;
 import java.nio.channels.ServerSocketChannel;
+import java.nio.channels.SocketChannel;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.ThreadPoolExecutor;
@@ -40,9 +42,10 @@ public final class Transport {
     private final AtomicInteger processorThreadCount = new AtomicInteger();
     final SelectLoop selectLoop;
     private static final SocketOption<Boolean> useHighPerformanceSockets = new HighPerformanceSocketOption();
-    private static final SocketOption<Long> nativeSignalOption = new SignalSocketOption();
     final ThreadWalkerInterruptor threadWalker;
     private final ServerSocketChannel interruptChannel;
+    final int recvbuf;
+    final int sendbuf;
 
 
     public Transport(IOProperties props) {
@@ -59,13 +62,18 @@ public final class Transport {
 
         selectLoop = props.getProperty(USING_SELECT_LOOP) ? new NonBlockingSelectLoop() : new BlockingSelectLoop(this);
         if (selectLoop.isBlocking()) {
-            try {
+            try (SocketChannel bufChannel = SocketChannel.open()) {
                 interruptChannel = ServerSocketChannel.open();
+                recvbuf = bufChannel.getOption(StandardSocketOptions.SO_RCVBUF);
+                sendbuf = bufChannel.getOption(StandardSocketOptions.SO_SNDBUF);
+                interruptChannel.setOption(useHighPerformanceSockets, true);
             } catch (IOException ex) {
                 throw new RuntimeException(ex);
             }
         } else {
             interruptChannel = null;
+            recvbuf = -1;
+            sendbuf = -1;
         }
     }
 
@@ -118,11 +126,11 @@ public final class Transport {
     }
 
     Long getNativeThreadFn() throws IOException {
-        return interruptChannel.getOption(nativeSignalOption);
+        return interruptChannel.getOption(null);
     }
 
     void interrupt(long thread) throws IOException {
-        interruptChannel.setOption(nativeSignalOption, thread);
+        interruptChannel.setOption(null, thread);
     }
 
     private static class HighPerformanceSocketOption implements SocketOption<Boolean> {
@@ -134,23 +142,6 @@ public final class Transport {
         @Override
         public Class<Boolean> type() {
             return Boolean.class;
-        }
-
-        @Override
-        public String toString() {
-            return name();
-        }
-    }
-
-    private static class SignalSocketOption implements SocketOption<Long> {
-        @Override
-        public String name() {
-            return "SignalSocketOption";
-        }
-
-        @Override
-        public Class<Long> type() {
-            return Long.class;
         }
 
         @Override

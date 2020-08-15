@@ -16,7 +16,6 @@ import java.nio.channels.SocketChannel;
  */
 public class SocketProviderWithBlockingDisabled extends KQueueSelectorProvider {
     static final String HighPerformanceOptionName = "UseHighPerformanceSockets";
-    static final String SignalSocketOptionName = "SignalSocketOption";
 
     @Override
     public SocketChannel openSocketChannel() throws IOException {
