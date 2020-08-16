@@ -48,7 +48,7 @@ public class BlockingSelectLoop implements SelectLoop {
 
     public void registerAccept(java.nio.channels.Channel channel, Callable<Boolean> acceptFn) {
         Callable<Boolean> callable = submitInLoop("accept", acceptFn,
-                channel::isOpen, transport::getNativeThreadFn);
+                channel::isOpen, transport::getNativeThread);
         if (!started) {
             queue.offer(callable);
         } else {
@@ -60,7 +60,7 @@ public class BlockingSelectLoop implements SelectLoop {
     public void registerRead(Channel channel) {
         if (channel.requestedReadCount.incrementAndGet() == 1) {
             transport.ioExec.submit(submitInLoop("read", channel::read,
-                    channel.channel::isOpen, transport::getNativeThreadFn));
+                    channel.channel::isOpen, transport::getNativeThread));
         }
     }
 
@@ -73,7 +73,7 @@ public class BlockingSelectLoop implements SelectLoop {
     public void registerWrite(Channel channel) {
         if (channel.requestedWriteCount.incrementAndGet() == 1) {
             transport.ioExec.submit(submitInLoop("write", channel::write,
-                    channel.channel::isOpen, transport::getNativeThreadFn));
+                    channel.channel::isOpen, transport::getNativeThread));
         }
     }
 

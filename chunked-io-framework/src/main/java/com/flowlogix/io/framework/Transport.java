@@ -41,7 +41,7 @@ public final class Transport {
     private final AtomicInteger ioThreadCount = new AtomicInteger();
     private final AtomicInteger processorThreadCount = new AtomicInteger();
     final SelectLoop selectLoop;
-    private static final SocketOption<Boolean> useHighPerformanceSockets = new HighPerformanceSocketOption();
+    static final SocketOption<Boolean> useHighPerformanceSockets = new HighPerformanceSocketOption();
     final ThreadWalkerInterruptor threadWalker;
     private final ServerSocketChannel interruptChannel;
     final int recvbuf;
@@ -125,7 +125,7 @@ public final class Transport {
         }
     }
 
-    Long getNativeThreadFn() throws IOException {
+    Long getNativeThread() throws IOException {
         return interruptChannel.getOption(null);
     }
 

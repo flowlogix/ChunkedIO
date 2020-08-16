@@ -20,6 +20,7 @@ import java.net.SocketTimeoutException;
 import java.nio.channels.AsynchronousCloseException;
 import java.nio.channels.SocketChannel;
 import sun.net.ConnectionResetException;
+import static sun.nio.ch.SocketProviderWithBlockingDisabled.HighPerformanceOptionName;
 
 /**
  *
@@ -137,7 +138,7 @@ class SocketChannelImplWithBlockingDisabled extends SocketChannelImpl {
         }
         if (IOStatus.okayToRetry(n) && isOpen()) {
             throw new SocketTimeoutException();
-        } else if (n <= 0) {
+        } else if (n < 0) {
             throw new AsynchronousCloseException();
         }
         return IOStatus.normalize(n);
@@ -162,7 +163,7 @@ class SocketChannelImplWithBlockingDisabled extends SocketChannelImpl {
         }
         if (IOStatus.okayToRetry(n) && isOpen()) {
             throw new SocketTimeoutException();
-        } else if (n <= 0) {
+        } else if (n < 0) {
             throw new AsynchronousCloseException();
         }
         return IOStatus.normalize(n);
@@ -196,6 +197,8 @@ class SocketChannelImplWithBlockingDisabled extends SocketChannelImpl {
         throws IOException {
         if (useHighPerformance) {
             NativeThread.signal((Long)value);
+        } else if (name.name().equals(HighPerformanceOptionName)) {
+            useHighPerformance = (Boolean)value;
         } else {
             super.setOption(name, value);
         }

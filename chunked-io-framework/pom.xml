@@ -79,6 +79,10 @@
                 <artifactId>maven-surefire-plugin</artifactId>
                 <version>2.22.2</version>
                 <configuration>
+                    <argLine>
+                        -Djava.nio.channels.spi.SelectorProvider=sun.nio.ch.SocketProviderWithBlockingDisabled
+                        --patch-module=java.base=${user.home}/.m2/repository/com/flowlogix/io/patched-nio/1.0-SNAPSHOT/patched-nio-1.0-SNAPSHOT.jar
+                    </argLine>
                 </configuration>
             </plugin>
             <plugin>
