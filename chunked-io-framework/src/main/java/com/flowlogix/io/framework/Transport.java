@@ -7,7 +7,9 @@ package com.flowlogix.io.framework;
 
 import static com.flowlogix.io.framework.IOProperties.Props.EVENTS_IDLE_TIMEOUT_IN_MILLIS;
 import static com.flowlogix.io.framework.IOProperties.Props.IO_THREAD_STACK_SIZE;
-import static com.flowlogix.io.framework.IOProperties.Props.MAX_IO_THREADS;
+import static com.flowlogix.io.framework.IOProperties.Props.MAX_ACCEPT_THREADS;
+import static com.flowlogix.io.framework.IOProperties.Props.MAX_READ_THREADS;
+import static com.flowlogix.io.framework.IOProperties.Props.MAX_WRITE_THREADS;
 import static com.flowlogix.io.framework.IOProperties.Props.USING_SELECT_LOOP;
 import com.flowlogix.io.framework.executor.ScalingThreadPoolExecutor;
 import java.io.IOException;
@@ -34,7 +36,8 @@ import java.util.logging.Logger;
 public final class Transport {
     private static final Logger log = Logger.getLogger(Transport.class.getName());
     final IOProperties props;
-    final ThreadPoolExecutor ioExec;
+    final ThreadPoolExecutor readExec;
+    final ThreadPoolExecutor writeExec;
     private final AtomicInteger ioThreadCount = new AtomicInteger();
     final SelectLoop selectLoop;
     static final SocketOption<Boolean> useHighPerformanceSockets = new HighPerformanceSocketOption();
@@ -49,9 +52,12 @@ public final class Transport {
         this.threadWalker = new ThreadWalkerInterruptor(this);
         int ioStackSize = props.getProperty(IO_THREAD_STACK_SIZE);
 
-        ioExec = newCachedThreadPool(r -> new Thread(Thread.currentThread().getThreadGroup(), r,
-                        String.format("I/O-Thread-%d", ioThreadCount.incrementAndGet()), ioStackSize),
-                props.getProperty(MAX_IO_THREADS));
+        readExec = newCachedThreadPool(r -> new Thread(Thread.currentThread().getThreadGroup(), r,
+                        String.format("Read-Thread-%d", ioThreadCount.incrementAndGet()), ioStackSize),
+                props.<Integer>getProperty(MAX_READ_THREADS) + props.<Integer>getProperty(MAX_ACCEPT_THREADS));
+        writeExec = newCachedThreadPool(r -> new Thread(Thread.currentThread().getThreadGroup(), r,
+                        String.format("Write-Thread-%d", ioThreadCount.incrementAndGet()), ioStackSize),
+                props.getProperty(MAX_WRITE_THREADS));
 
         selectLoop = props.getProperty(USING_SELECT_LOOP) ? new NonBlockingSelectLoop() : new BlockingSelectLoop(this);
         if (selectLoop.isBlocking()) {
@@ -79,7 +85,8 @@ public final class Transport {
 
     public void stop() {
         selectLoop.stop();
-        ioExec.shutdown();
+        readExec.shutdown();
+        writeExec.shutdown();
         if (selectLoop.isBlocking()) {
             threadWalker.stop();
         }

@@ -17,7 +17,9 @@ public class IOProperties {
         SOCKET_TIMEOUT_IN_MILLIS,
         EVENTS_IDLE_TIMEOUT_IN_MILLIS,
         EVENTS_UNDER_LOAD_TIMEOUT_NANOS,
-        MAX_IO_THREADS,
+        MAX_ACCEPT_THREADS,
+        MAX_READ_THREADS,
+        MAX_WRITE_THREADS,
         IO_THREAD_STACK_SIZE,
         USING_SELECT_LOOP,
     }
@@ -30,7 +32,9 @@ public class IOProperties {
         setProperty(IOProperties.Props.ACCEPT_BACKLOG, 4096);
         setProperty(IOProperties.Props.SOCKET_TIMEOUT_IN_MILLIS, 100L);
         setProperty(IOProperties.Props.IO_THREAD_STACK_SIZE, 1024);
-        setProperty(IOProperties.Props.MAX_IO_THREADS, 200);
+        setProperty(IOProperties.Props.MAX_ACCEPT_THREADS, 5);
+        setProperty(IOProperties.Props.MAX_READ_THREADS, 200);
+        setProperty(IOProperties.Props.MAX_WRITE_THREADS, 200);
         setProperty(IOProperties.Props.EVENTS_UNDER_LOAD_TIMEOUT_NANOS, 5L * 1000000);
         setProperty(IOProperties.Props.EVENTS_IDLE_TIMEOUT_IN_MILLIS, 50L);
         setProperty(IOProperties.Props.USING_SELECT_LOOP, false);

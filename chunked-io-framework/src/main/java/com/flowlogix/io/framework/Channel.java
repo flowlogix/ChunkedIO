@@ -32,7 +32,7 @@ public class Channel {
     private final int writeChunkSize;
     private StringBuilder readerMessageBuilder;
     private final MessageHandler handler;
-    private TransferQueue<String> writeQ = new LinkedTransferQueue<>();
+    private final TransferQueue<String> writeQ = new LinkedTransferQueue<>();
     final AtomicInteger requestedReadCount = new AtomicInteger();
     final AtomicInteger requestedWriteCount = new AtomicInteger();
 

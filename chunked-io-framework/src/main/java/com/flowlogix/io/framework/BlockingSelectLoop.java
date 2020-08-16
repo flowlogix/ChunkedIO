@@ -6,8 +6,10 @@
 package com.flowlogix.io.framework;
 
 import static com.flowlogix.io.framework.Transport.logException;
+import java.nio.channels.NetworkChannel;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.ExecutorService;
 import java.util.logging.Logger;
 
 /**
@@ -18,7 +20,7 @@ public class BlockingSelectLoop implements SelectLoop {
     private static final Logger log = Logger.getLogger(BlockingSelectLoop.class.getName());
     private final Transport transport;
     private volatile boolean started;
-    private final ConcurrentLinkedQueue<Callable<Boolean>> queue = new ConcurrentLinkedQueue<>();
+    private final ConcurrentLinkedQueue<Callable<Boolean>> acceptQueue = new ConcurrentLinkedQueue<>();
 
     public BlockingSelectLoop(Transport transport) {
         this.transport = transport;
@@ -28,11 +30,11 @@ public class BlockingSelectLoop implements SelectLoop {
     public void start() {
         started = true;
         while (started) {
-            Callable<Boolean> callable = queue.poll();
+            Callable<Boolean> callable = acceptQueue.poll();
             if (callable == null) {
                 break;
             }
-            transport.ioExec.submit(callable);
+            transport.readExec.submit(callable);
         }
     }
 
@@ -46,20 +48,20 @@ public class BlockingSelectLoop implements SelectLoop {
         registerAccept(server.socket, () -> server.accept(server.socket));
     }
 
-    public void registerAccept(java.nio.channels.Channel channel, Callable<IOResult> acceptFn) {
-        Callable<Boolean> callable = submitInLoop("accept", acceptFn,
+    public void registerAccept(NetworkChannel channel, Callable<IOResult> acceptFn) {
+        Callable<Boolean> callable = submitInLoop("accept", transport.readExec, acceptFn,
                 channel::isOpen, transport::getNativeThread);
         if (!started) {
-            queue.offer(callable);
+            acceptQueue.offer(callable);
         } else {
-            transport.ioExec.submit(callable);
+            transport.readExec.submit(callable);
         }
     }
 
     @Override
     public void registerRead(Channel channel) {
         if (channel.requestedReadCount.incrementAndGet() == 1) {
-            transport.ioExec.submit(submitInLoop("read", channel::read,
+            transport.readExec.submit(submitInLoop("read", transport.readExec, channel::read,
                     channel.channel::isOpen, transport::getNativeThread));
         }
     }
@@ -72,7 +74,7 @@ public class BlockingSelectLoop implements SelectLoop {
     @Override
     public void registerWrite(Channel channel) {
         if (channel.requestedWriteCount.incrementAndGet() == 1) {
-            transport.ioExec.submit(submitInLoop("write", channel::write,
+            transport.writeExec.submit(submitInLoop("write", transport.writeExec, channel::write,
                     channel.channel::isOpen, transport::getNativeThread));
         }
     }
@@ -82,12 +84,12 @@ public class BlockingSelectLoop implements SelectLoop {
         return channel.requestedWriteCount.decrementAndGet() != 0;
     }
 
-    private<ChannelType> Callable<Boolean> submitInLoop(String operation, Callable<IOResult> callable,
+    private<ChannelType> Callable<Boolean> submitInLoop(String operation, ExecutorService exec, Callable<IOResult> callable,
             Callable<Boolean> isOpenFn, Callable<Long> nativeThrFn) {
         return logExceptions(operation, nativeThrFn, () -> {
             IOResult result = callable.call();
             if (result.recurse && isOpenFn.call()) {
-                transport.ioExec.submit(submitInLoop(operation, callable, isOpenFn, nativeThrFn));
+                exec.submit(submitInLoop(operation, exec, callable, isOpenFn, nativeThrFn));
             }
             if (result.messageHandler != null) {
                 result.messageHandler.run();

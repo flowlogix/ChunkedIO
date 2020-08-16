@@ -6,6 +6,7 @@
 package com.flowlogix.io.framework;
 
 import static com.flowlogix.io.framework.IOProperties.Props.ACCEPT_BACKLOG;
+import static com.flowlogix.io.framework.IOProperties.Props.MAX_ACCEPT_THREADS;
 import com.flowlogix.io.framework.SelectLoop.IOResult;
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -14,6 +15,7 @@ import java.net.StandardSocketOptions;
 import java.nio.channels.ServerSocketChannel;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.logging.Logger;
+import java.util.stream.IntStream;
 
 /**
  *
@@ -53,7 +55,8 @@ public class Server {
     public void start() {
         try {
             socket.bind(new InetSocketAddress(port), transport.props.getProperty(ACCEPT_BACKLOG));
-            transport.selectLoop.registerAccept(this);
+            IntStream.range(1, transport.props.getProperty(MAX_ACCEPT_THREADS))
+                    .forEach(ii -> transport.selectLoop.registerAccept(this));
         } catch (IOException ex) {
             throw new RuntimeException(ex);
         }

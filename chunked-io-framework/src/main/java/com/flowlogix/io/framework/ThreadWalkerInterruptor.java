@@ -89,7 +89,7 @@ public class ThreadWalkerInterruptor {
     private void checkLoad() {
         while (started) {
             if (isUnderLoad.get()) {
-                if (transport.ioExec.getQueue().isEmpty()) {
+                if (transport.readExec.getQueue().isEmpty() && transport.writeExec.getQueue().isEmpty()) {
                     ++underLoadResetCount;
                     if (underLoadResetCount == 10) {
                         underLoadResetCount = 0;
