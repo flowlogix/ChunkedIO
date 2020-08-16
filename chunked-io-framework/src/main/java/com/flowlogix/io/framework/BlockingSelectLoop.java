@@ -46,7 +46,7 @@ public class BlockingSelectLoop implements SelectLoop {
         registerAccept(server.socket, () -> server.accept(server.socket));
     }
 
-    public void registerAccept(java.nio.channels.Channel channel, Callable<Boolean> acceptFn) {
+    public void registerAccept(java.nio.channels.Channel channel, Callable<IOResult> acceptFn) {
         Callable<Boolean> callable = submitInLoop("accept", acceptFn,
                 channel::isOpen, transport::getNativeThread);
         if (!started) {
@@ -82,14 +82,17 @@ public class BlockingSelectLoop implements SelectLoop {
         return channel.requestedWriteCount.decrementAndGet() != 0;
     }
 
-    private<ChannelType> Callable<Boolean> submitInLoop(String operation, Callable<Boolean> callable,
+    private<ChannelType> Callable<Boolean> submitInLoop(String operation, Callable<IOResult> callable,
             Callable<Boolean> isOpenFn, Callable<Long> nativeThrFn) {
         return logExceptions(operation, nativeThrFn, () -> {
-            boolean resubmit = callable.call();
-            if (resubmit && isOpenFn.call()) {
+            IOResult result = callable.call();
+            if (result.recurse && isOpenFn.call()) {
                 transport.ioExec.submit(submitInLoop(operation, callable, isOpenFn, nativeThrFn));
             }
-            return resubmit;
+            if (result.messageHandler != null) {
+                result.messageHandler.run();
+            }
+            return result.recurse;
         });
     }
 

@@ -5,6 +5,7 @@
  */
 package com.flowlogix.io.framework;
 
+import com.flowlogix.io.framework.SelectLoop.IOResult;
 import java.io.IOException;
 import java.net.SocketTimeoutException;
 import java.nio.BufferOverflowException;
@@ -77,8 +78,8 @@ public class Channel {
         }
     }
 
-    boolean write() {
-        boolean recurse = true;
+    IOResult write() {
+        IOResult result = new IOResult(true, null);
         try {
             if (writeBuf == null && channel.isOpen()) {
                 String message = writeQ.take();
@@ -98,26 +99,26 @@ public class Channel {
                 if (!writeBuf.hasRemaining()) {
                     writeBuf.clear();
                     writeBuf = null;
-                    recurse = transport.selectLoop.unregisterWrite(this);
+                    result = new IOResult(transport.selectLoop.unregisterWrite(this), null);
                 }
             } else { // channel closed
                 close();
             }
         } catch (SocketTimeoutException e) {
-            return true;
+            return result;
         } catch (IOException | InterruptedException ex) {
             throw new RuntimeException(ex);
         }
-        return recurse;
+        return result;
     }
 
-    boolean read() {
-        boolean recurse = true;
+    IOResult read() {
+        IOResult result = new IOResult(true, null);
         try {
             int readVal = channel.read(readBuf);
             if (readVal == -1) {
                 close();
-                return false;
+                return new IOResult(false, null);
             }
             if (!readBuf.hasRemaining()) {
                 if (readerMessageBuilder == null) {
@@ -126,12 +127,12 @@ public class Channel {
                 readerMessageBuilder.append(StandardCharsets.UTF_8.decode(readBuf.flip()));
                 readBuf.clear();
                 if (readerMessageBuilder.charAt(readerMessageBuilder.length() - 1) != System.lineSeparator().charAt(0)) {
-                    return true;
+                    return result;
                 }
             } else if (readBuf.position() != 0
                     && StandardCharsets.UTF_8.decode(readBuf.slice(readBuf.position() - 1, 1)).charAt(0)
                     != System.lineSeparator().charAt(0)) {
-                return true;
+                return result;
             }
 
             if (readerMessageBuilder == null) {
@@ -139,16 +140,15 @@ public class Channel {
             }
             readerMessageBuilder.append(StandardCharsets.UTF_8.decode(readBuf.flip()));
             String message = readerMessageBuilder.toString();
-            transport.processorExec.submit(Transport.logExceptions(() -> handler.onMessage(this, message)));
             readBuf.clear();
             readerMessageBuilder = null;
-            recurse = transport.selectLoop.unregisterRead(this);
+            return new IOResult(transport.selectLoop.unregisterRead(this),
+                    Transport.logExceptions(Transport.logExceptions(() -> handler.onMessage(this, message))));
         } catch (SocketTimeoutException e) {
-            return true;
+                return new IOResult(true, null);
         } catch (IOException | BufferOverflowException ex) {
             close();
             throw new RuntimeException(ex);
         }
-        return recurse;
     }
 }

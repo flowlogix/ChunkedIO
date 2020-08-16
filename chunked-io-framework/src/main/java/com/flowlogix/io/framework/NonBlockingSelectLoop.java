@@ -59,12 +59,16 @@ public class NonBlockingSelectLoop implements SelectLoop {
                         if (key.channel() instanceof SocketChannel) {
                             Channel channel = (Channel) key.attachment();
                             if (key.isValid() && key.isReadable()) {
-                                if (!channel.read() && channel.channel.isOpen()) {
+                                IOResult result = channel.read();
+                                if (result.messageHandler != null) {
+                                    result.messageHandler.run();
+                                }
+                                if (!result.recurse && channel.channel.isOpen()) {
                                     channel.channel.keyFor(selector).interestOpsAnd(SelectionKey.OP_WRITE);
                                 }
                             }
                             if (key.isValid() && key.isWritable()) {
-                                if (!channel.write() && channel.channel.isOpen()) {
+                                if (!channel.write().recurse && channel.channel.isOpen()) {
                                     channel.channel.keyFor(selector).interestOpsAnd(SelectionKey.OP_READ);
                                 }
                             }

@@ -7,7 +7,6 @@ package com.flowlogix.io.framework;
 
 import static com.flowlogix.io.framework.IOProperties.Props.EVENTS_IDLE_TIMEOUT_IN_MILLIS;
 import static com.flowlogix.io.framework.IOProperties.Props.IO_THREAD_STACK_SIZE;
-import static com.flowlogix.io.framework.IOProperties.Props.MAX_EXEC_THREADS;
 import static com.flowlogix.io.framework.IOProperties.Props.MAX_IO_THREADS;
 import static com.flowlogix.io.framework.IOProperties.Props.USING_SELECT_LOOP;
 import com.flowlogix.io.framework.executor.ScalingThreadPoolExecutor;
@@ -22,7 +21,6 @@ import java.nio.channels.ClosedSelectorException;
 import java.nio.channels.NetworkChannel;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
-import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
@@ -37,9 +35,7 @@ public final class Transport {
     private static final Logger log = Logger.getLogger(Transport.class.getName());
     final IOProperties props;
     final ThreadPoolExecutor ioExec;
-    final ExecutorService processorExec;
     private final AtomicInteger ioThreadCount = new AtomicInteger();
-    private final AtomicInteger processorThreadCount = new AtomicInteger();
     final SelectLoop selectLoop;
     static final SocketOption<Boolean> useHighPerformanceSockets = new HighPerformanceSocketOption();
     final ThreadWalkerInterruptor threadWalker;
@@ -56,9 +52,6 @@ public final class Transport {
         ioExec = newCachedThreadPool(r -> new Thread(Thread.currentThread().getThreadGroup(), r,
                         String.format("I/O-Thread-%d", ioThreadCount.incrementAndGet()), ioStackSize),
                 props.getProperty(MAX_IO_THREADS));
-        processorExec = newCachedThreadPool(r -> new Thread(Thread.currentThread().getThreadGroup(),
-                r, String.format("Processor-%d", processorThreadCount.incrementAndGet()), ioStackSize),
-                props.getProperty(MAX_EXEC_THREADS));
 
         selectLoop = props.getProperty(USING_SELECT_LOOP) ? new NonBlockingSelectLoop() : new BlockingSelectLoop(this);
         if (selectLoop.isBlocking()) {
@@ -87,7 +80,6 @@ public final class Transport {
     public void stop() {
         selectLoop.stop();
         ioExec.shutdown();
-        processorExec.shutdown();
         if (selectLoop.isBlocking()) {
             threadWalker.stop();
         }

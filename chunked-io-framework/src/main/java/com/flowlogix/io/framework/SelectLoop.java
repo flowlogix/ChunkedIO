@@ -10,6 +10,16 @@ package com.flowlogix.io.framework;
  * @author lprimak
  */
 interface SelectLoop {
+    class IOResult {
+        final boolean recurse;
+        final Runnable messageHandler;
+
+        public IOResult(boolean recurse, Runnable messageHandler) {
+            this.recurse = recurse;
+            this.messageHandler = messageHandler;
+        }
+    }
+
     void start();
     void stop();
     void registerAccept(Server server);

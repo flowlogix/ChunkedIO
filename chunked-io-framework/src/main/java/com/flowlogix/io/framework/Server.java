@@ -6,6 +6,7 @@
 package com.flowlogix.io.framework;
 
 import static com.flowlogix.io.framework.IOProperties.Props.ACCEPT_BACKLOG;
+import com.flowlogix.io.framework.SelectLoop.IOResult;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.SocketTimeoutException;
@@ -39,14 +40,14 @@ public class Server {
         }
     }
 
-    boolean accept(ServerSocketChannel channel) {
+    IOResult accept(ServerSocketChannel channel) {
         try {
             channels.add(new Channel(transport, messageHandler, channel.accept()));
         } catch (SocketTimeoutException ex) {
         } catch (IOException ex) {
             throw new RuntimeException(ex);
         }
-        return true;
+        return new IOResult(true, null);
     }
 
     public void start() {
