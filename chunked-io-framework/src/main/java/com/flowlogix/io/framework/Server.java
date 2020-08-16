@@ -55,7 +55,7 @@ public class Server {
     public void start() {
         try {
             socket.bind(new InetSocketAddress(port), transport.props.getProperty(ACCEPT_BACKLOG));
-            IntStream.range(1, transport.props.getProperty(MAX_ACCEPT_THREADS))
+            IntStream.rangeClosed(1, transport.props.getProperty(MAX_ACCEPT_THREADS))
                     .forEach(ii -> transport.selectLoop.registerAccept(this));
         } catch (IOException ex) {
             throw new RuntimeException(ex);
