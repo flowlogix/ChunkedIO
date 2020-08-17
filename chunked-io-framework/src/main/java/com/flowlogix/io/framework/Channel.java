@@ -5,6 +5,7 @@
  */
 package com.flowlogix.io.framework;
 
+import static com.flowlogix.io.framework.IOProperties.Props.MAX_WRITE_QUEUE;
 import com.flowlogix.io.framework.SelectLoop.IOResult;
 import java.io.IOException;
 import java.net.SocketTimeoutException;
@@ -12,9 +13,8 @@ import java.nio.BufferOverflowException;
 import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
 import java.nio.charset.StandardCharsets;
-import java.util.concurrent.LinkedTransferQueue;
+import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TransferQueue;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Logger;
 
@@ -32,7 +32,7 @@ public class Channel {
     private final int writeChunkSize;
     private StringBuilder readerMessageBuilder;
     private final MessageHandler handler;
-    private final TransferQueue<String> writeQ = new LinkedTransferQueue<>();
+    private final LinkedBlockingQueue<String> writeQ;
     final AtomicInteger requestedReadCount = new AtomicInteger();
     final AtomicInteger requestedWriteCount = new AtomicInteger();
 
@@ -44,6 +44,7 @@ public class Channel {
         writeChunkSize = transport.sendbuf;
         this.handler = messageHandler;
         transport.selectLoop.registerRead(this);
+        this.writeQ = new LinkedBlockingQueue<>(transport.props.getProperty(MAX_WRITE_QUEUE));
     }
 
     void close() {
@@ -65,7 +66,7 @@ public class Channel {
         try {
             if (channel.isOpen()) {
                 transport.selectLoop.registerWrite(this);
-                if (!writeQ.tryTransfer(message, 5, TimeUnit.SECONDS)) {
+                if (!writeQ.offer(message, 5, TimeUnit.SECONDS)) {
                     transport.selectLoop.unregisterWrite(this);
                     throw new IllegalStateException(String.format("Timed Out Writing, writeCount = %d, queue size: %d, channel = %s",
                             requestedWriteCount.get(), writeQ.size(), System.identityHashCode(this)));

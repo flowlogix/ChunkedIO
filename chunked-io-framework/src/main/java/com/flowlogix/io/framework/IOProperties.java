@@ -20,6 +20,7 @@ public class IOProperties {
         MAX_ACCEPT_THREADS,
         MAX_READ_THREADS,
         MAX_WRITE_THREADS,
+        MAX_WRITE_QUEUE,
         IO_THREAD_STACK_SIZE,
         USING_SELECT_LOOP,
     }
@@ -35,6 +36,7 @@ public class IOProperties {
         setProperty(IOProperties.Props.MAX_ACCEPT_THREADS, 5);
         setProperty(IOProperties.Props.MAX_READ_THREADS, 200);
         setProperty(IOProperties.Props.MAX_WRITE_THREADS, 200);
+        setProperty(IOProperties.Props.MAX_WRITE_QUEUE, 1000);
         setProperty(IOProperties.Props.EVENTS_UNDER_LOAD_TIMEOUT_NANOS, 5L * 1000000);
         setProperty(IOProperties.Props.EVENTS_IDLE_TIMEOUT_IN_MILLIS, 50L);
         setProperty(IOProperties.Props.USING_SELECT_LOOP, false);

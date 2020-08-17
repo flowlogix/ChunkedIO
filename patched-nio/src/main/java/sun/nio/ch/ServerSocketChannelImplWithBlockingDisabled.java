@@ -66,7 +66,7 @@ class ServerSocketChannelImplWithBlockingDisabled extends ServerSocketChannelImp
         throws IOException
     {
         if (useHighPerformance) {
-            return (T)Long.valueOf(NativeThread.current());
+            return (T)(Long)NativeThread.current();
         } else {
             return super.getOption(name);
         }

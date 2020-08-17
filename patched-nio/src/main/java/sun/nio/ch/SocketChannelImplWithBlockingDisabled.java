@@ -186,7 +186,7 @@ class SocketChannelImplWithBlockingDisabled extends SocketChannelImpl {
         throws IOException
     {
         if (useHighPerformance) {
-            return (T)Long.valueOf(NativeThread.current());
+            return (T)(Long)NativeThread.current();
         } else {
             return super.getOption(name);
         }
