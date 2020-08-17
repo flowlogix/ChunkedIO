@@ -124,7 +124,7 @@ class ServerSocketChannelImplWithBlockingDisabled extends ServerSocketChannelImp
         } else if (IOStatus.okayToRetry(n) && isOpen()) {
             throw new SocketTimeoutException();
         } else {
-            return null;
+            throw new ClosedChannelException();
         }
     }
 
