@@ -43,8 +43,8 @@ public class Channel {
         readBuf = ByteBuffer.allocateDirect(transport.recvbuf);
         writeChunkSize = transport.sendbuf;
         this.handler = messageHandler;
+        this.writeQ = new LinkedBlockingQueue<>((int)transport.props.getProperty(MAX_WRITE_QUEUE));
         transport.selectLoop.registerRead(this);
-        this.writeQ = new LinkedBlockingQueue<>(transport.props.getProperty(MAX_WRITE_QUEUE));
     }
 
     void close() {
@@ -85,22 +85,27 @@ public class Channel {
             if (writeBuf == null && channel.isOpen()) {
                 String message = writeQ.take();
                 writeBuf = StandardCharsets.UTF_8.encode(message);
+                // First stage - take message from queue and put into buffer
             } else if (writeBuf != null) {
                 if (writeChunk == null) {
                     int nextChunk = Math.min(writeBuf.remaining(), writeChunkSize);
                     int position = writeBuf.position();
                     writeChunk = writeBuf.slice(position, nextChunk);
                     writeBuf.position(position + nextChunk);
+                    // Second stage - get next chunk (or full buffer)
                 }
                 channel.write(writeChunk);
                 if (!writeChunk.hasRemaining()) {
                     writeChunk.clear();
                     writeChunk = null;
+                    // this should always be the case in blocknig write, the
+                    // whole chunk should be written out
                 }
                 if (!writeBuf.hasRemaining()) {
                     writeBuf.clear();
                     writeBuf = null;
                     result = new IOResult(transport.selectLoop.unregisterWrite(this), null);
+                    // Fourth stage - whole message is written
                 }
             } else { // channel closed
                 close();
@@ -125,14 +130,17 @@ public class Channel {
                 if (readerMessageBuilder == null) {
                     readerMessageBuilder = new StringBuilder();
                 }
+                // Stage one - first chunk has been completely read
                 readerMessageBuilder.append(StandardCharsets.UTF_8.decode(readBuf.flip()));
                 readBuf.clear();
                 if (readerMessageBuilder.charAt(readerMessageBuilder.length() - 1) != System.lineSeparator().charAt(0)) {
+                    // if whole message not ends with a newline, read more
                     return result;
                 }
             } else if (readBuf.position() != 0
                     && StandardCharsets.UTF_8.decode(readBuf.slice(readBuf.position() - 1, 1)).charAt(0)
                     != System.lineSeparator().charAt(0)) {
+                // if current chunk doesn't end with a newline, read more
                 return result;
             }
 
@@ -145,6 +153,7 @@ public class Channel {
             readerMessageBuilder = null;
             return new IOResult(transport.selectLoop.unregisterRead(this),
                     Transport.logExceptions(Transport.logExceptions(() -> handler.onMessage(this, message))));
+            // end of message
         } catch (SocketTimeoutException e) {
                 return new IOResult(true, null);
         } catch (IOException | BufferOverflowException ex) {

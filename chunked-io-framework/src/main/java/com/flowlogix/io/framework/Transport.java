@@ -60,19 +60,17 @@ public final class Transport {
                 props.getProperty(MAX_WRITE_THREADS));
 
         selectLoop = props.getProperty(USING_SELECT_LOOP) ? new NonBlockingSelectLoop() : new BlockingSelectLoop(this);
-        if (selectLoop.isBlocking()) {
-            try (SocketChannel bufChannel = SocketChannel.open()) {
+        try (SocketChannel bufChannel = SocketChannel.open()) {
+            if (selectLoop.isBlocking()) {
                 interruptChannel = ServerSocketChannel.open();
-                recvbuf = bufChannel.getOption(StandardSocketOptions.SO_RCVBUF);
-                sendbuf = bufChannel.getOption(StandardSocketOptions.SO_SNDBUF);
                 interruptChannel.setOption(useHighPerformanceSockets, true);
-            } catch (IOException ex) {
-                throw new RuntimeException(ex);
+            } else {
+                interruptChannel = null;
             }
-        } else {
-            interruptChannel = null;
-            recvbuf = -1;
-            sendbuf = -1;
+            recvbuf = bufChannel.getOption(StandardSocketOptions.SO_RCVBUF);
+            sendbuf = bufChannel.getOption(StandardSocketOptions.SO_SNDBUF);
+        } catch (IOException ex) {
+            throw new RuntimeException(ex);
         }
     }
 
